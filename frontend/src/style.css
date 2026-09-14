@@ -1,0 +1,96 @@
+/* Base visual compartilhada por todas as telas. */
+:root {
+    --green-900: #174b3b;
+    --green-700: #24785a;
+    --green-100: #e4f1eb;
+    --ink: #21352e;
+    --muted: #60736a;
+    --surface: #ffffff;
+    --line: #d6e5dd;
+    --background: #f3f8f5;
+    --shadow: 0 12px 30px rgba(23, 75, 59, 0.09);
+}
+
+* { box-sizing: border-box; }
+html { min-width: 280px; }
+body { margin: 0; color: var(--ink); background: var(--background); font-family: Arial, sans-serif; font-size: 16px; line-height: 1.5; }
+button, input { font: inherit; }
+button { cursor: pointer; border: 0; border-radius: 8px; padding: 0.75rem 1.1rem; color: #fff; background: var(--green-700); font-weight: 700; transition: background 0.2s ease, transform 0.2s ease; }
+button:hover { background: var(--green-900); transform: translateY(-1px); }
+button:focus-visible, input:focus-visible { outline: 3px solid #8ac8ab; outline-offset: 2px; }
+
+/* O cabeçalho permanece visível durante a navegação. */
+.header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; padding: 1rem 5%; color: #fff; background: var(--green-900); box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12); }
+.header strong { font-size: 1.35rem; letter-spacing: 0.02em; }
+.header > span { margin-left: auto; color: #d6eee2; font-size: 0.92rem; }
+.nav { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.nav button { padding: 0.45rem 0.7rem; color: #e8f5ee; background: transparent; border: 1px solid #86bda3; }
+.nav button:hover { background: #286e54; }
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.container { width: min(1100px, 90%); flex: 1; margin: 2.5rem auto; }
+.container-login { display: grid; place-items: center; }
+.page { animation: appear 0.3s ease-out; }
+.page h1 { margin: 0 0 0.5rem; color: var(--green-900); font-size: clamp(1.8rem, 3vw, 2.5rem); }
+.page h2 { color: var(--green-900); font-size: 1.25rem; }
+.page > p { color: var(--muted); }
+
+/* Login recebe uma composição compacta e centralizada. */
+.login-page { width: min(440px, 100%); padding: clamp(1.5rem, 4vw, 2.5rem); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.login-page h1 { margin-bottom: 0.25rem; }
+.form-card { display: grid; gap: 0.65rem; padding: 1.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.form-card label { color: var(--muted); font-size: 0.95rem; font-weight: 700; }
+.form-card input { width: 100%; min-height: 2.8rem; padding: 0.65rem 0.75rem; border: 1px solid #adc5b8; border-radius: 7px; color: var(--ink); background: #fbfdfc; }
+.form-card button { margin-top: 0.5rem; }
+
+/* Home usa ações amplas para destacar os próximos passos. */
+.home-page { padding: clamp(1.5rem, 5vw, 4rem); background: linear-gradient(135deg, #e5f3eb, #fff); border: 1px solid var(--line); border-radius: 16px; }
+.home-actions, .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+.page-grid { display: grid; grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr); gap: 1.5rem; align-items: start; }
+.list-card { padding: 1.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.list-card ul, .approval-list { padding-left: 1.25rem; }
+.list-card li { margin: 0.7rem 0; }
+.status { display: inline-block; margin-left: 0.25rem; padding: 0.15rem 0.5rem; color: var(--green-900); background: var(--green-100); border-radius: 999px; font-size: 0.82rem; font-weight: 700; }
+
+/* Relatórios prioriza leitura da tabela, inclusive em telas estreitas. */
+.report-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 1.25rem 0; }
+.report-toolbar p { margin: 0; color: var(--muted); }
+.table-wrapper { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+table { width: 100%; min-width: 520px; border-collapse: collapse; background: var(--surface); }
+th, td { padding: 0.9rem 1rem; text-align: left; border-bottom: 1px solid var(--line); }
+th { color: var(--green-900); background: var(--green-100); }
+
+/* Aprovação apresenta cada reserva como uma linha de decisão. */
+.approval-list { display: grid; gap: 0.8rem; margin-top: 1.5rem; padding: 0; list-style: none; }
+.approval-item { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid #e0a647; border-radius: 10px; box-shadow: var(--shadow); }
+.approval-item .actions { margin: 0; }
+.approval-item .actions button:last-child { background: #a94b4b; }
+.footer { padding: 1.25rem 5%; color: #d6eee2; text-align: center; background: var(--green-900); }
+
+@keyframes appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Em mobile, cada área ocupa a largura disponível e os controles ficam maiores. */
+@media (max-width: 700px) {
+    .header { align-items: flex-start; gap: 0.75rem; padding: 0.9rem 5%; }
+    .header > span { width: 100%; margin-left: 0; }
+    .nav { width: 100%; }
+    .nav button { flex: 1; min-width: 8rem; }
+    .container { width: 90%; margin: 1.5rem auto; }
+    .page-grid { grid-template-columns: 1fr; }
+    .home-actions, .home-actions button, .report-toolbar { width: 100%; }
+    .home-actions button { min-height: 3rem; }
+    .report-toolbar { align-items: stretch; flex-direction: column; }
+    .report-toolbar button { width: 100%; }
+    .approval-item { align-items: stretch; flex-direction: column; }
+    .approval-item .actions button { flex: 1; }
+}
+
+/* Em TVs e telas muito grandes, o conteúdo ganha escala e respiro. */
+@media (min-width: 1600px) {
+    body { font-size: 21px; }
+    .header { padding: 1.35rem 6%; }
+    .container { width: min(1350px, 86%); margin-top: 4rem; margin-bottom: 4rem; }
+    .footer { padding: 1.75rem 6%; }
+    button { padding: 0.9rem 1.35rem; }
+    th, td { padding: 1.15rem 1.3rem; }
+}

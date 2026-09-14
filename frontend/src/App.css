@@ -1,0 +1,115 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: #24313a;
+    background: #f4f7f5;
+}
+
+button {
+    cursor: pointer;
+    border: 0;
+    padding: 0.6rem 1rem;
+    color: white;
+    background: #237a57;
+    border-radius: 4px;
+}
+
+button:hover {
+    background: #195d42;
+}
+
+.app {
+    min-height: 100vh;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding: 1rem 5%;
+    color: white;
+    background: #165a3f;
+}
+
+.header span {
+    margin-left: auto;
+    font-size: 0.9rem;
+}
+
+.nav {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.nav button {
+    padding: 0.35rem 0.6rem;
+    background: transparent;
+    border: 1px solid #b8dec9;
+}
+
+.container {
+    width: min(900px, 90%);
+    margin: 2rem auto;
+}
+
+.form-card {
+    display: grid;
+    gap: 0.6rem;
+    max-width: 420px;
+    padding: 1.5rem;
+    background: white;
+    border: 1px solid #d6e2da;
+    border-radius: 6px;
+}
+
+input {
+    padding: 0.6rem;
+    border: 1px solid #aebdb4;
+    border-radius: 4px;
+}
+
+.actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+table {
+    width: 100%;
+    margin-top: 1rem;
+    border-collapse: collapse;
+    background: white;
+}
+
+th,
+td {
+    padding: 0.7rem;
+    text-align: left;
+    border: 1px solid #d6e2da;
+}
+
+th {
+    background: #e2eee7;
+}
+
+li {
+    margin: 0.6rem 0;
+}
+
+.approval-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.7rem;
+    background: white;
+    border: 1px solid #d6e2da;
+    list-style: none;
+}
