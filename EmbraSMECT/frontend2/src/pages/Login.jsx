@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
-  const [email, setEmail] = useState('joao@email.com');
-  const [senha, setSenha] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -12,8 +12,12 @@ export default function Login() {
   async function handleSubmit(event) {
     event.preventDefault();
     setErro('');
-    try { await login(email, senha); navigate('/'); }
-    catch { setErro('Usuário ou senha inválidos.'); }
+    try {
+      await login(email, senha);
+      navigate('/');
+    } catch (error) {
+      setErro(error.response?.data?.erro || 'Não foi possível conectar à API.');
+    }
   }
 
   return <div className="login-page"><form className="login-card" onSubmit={handleSubmit}>
@@ -23,6 +27,5 @@ export default function Login() {
     <label>Senha<input type="password" value={senha} onChange={(event) => setSenha(event.target.value)} required /></label>
     {erro && <div className="error">{erro}</div>}
     <button className="primary-button" type="submit">Entrar</button>
-    <small>Teste: joao@email.com / 123456</small>
   </form></div>;
 }

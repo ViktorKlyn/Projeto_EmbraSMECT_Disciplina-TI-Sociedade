@@ -9,10 +9,12 @@ export function AuthProvider({ children }) {
   async function login(email, senha) {
     const { data } = await api.post('/login', { email, senha });
     setUser(data.usuario);
+    sessionStorage.setItem('embrasmect_token', data.token);
   }
 
   function logout() {
     setUser(null);
+    sessionStorage.removeItem('embrasmect_token');
   }
 
   return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
