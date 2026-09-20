@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken';
 
-const jwtSecret = process.env.JWT_SECRET || 'desenvolvimento-troque-esta-chave';
+const jwtSecret = process.env.JWT_SECRET;
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET precisa ser configurada em produção.');
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET deve ser definida como variável de ambiente.');
 }
 
 export function exigirAutenticacao(req, res, next) {

@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// Todas as chamadas do frontend passam por esta instância.
+const baseApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const normalizedBaseUrl = baseApiUrl.endsWith('/api') ? baseApiUrl : `${baseApiUrl.replace(/\/$/, '')}/api`;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  baseURL: normalizedBaseUrl,
   headers: { 'Content-Type': 'application/json' },
 });
 
