@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Tela pública que coleta as credenciais e inicia a sessão.
 export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -9,6 +10,7 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // Impede o recarregamento da página e trata a resposta do backend.
   async function handleSubmit(event) {
     event.preventDefault();
     setErro('');

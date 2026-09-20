@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 
+// Consulta a API e apresenta as reservas em formato de relatório.
 export default function Relatorios() {
   const [reservas, setReservas] = useState([]);
   useEffect(() => { api.get('/reservas').then(({ data }) => setReservas(data)); }, []);

@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Estrutura compartilhada pelas páginas que exigem autenticação.
 export default function Layout() {
   const { user, logout } = useAuth();
   return (

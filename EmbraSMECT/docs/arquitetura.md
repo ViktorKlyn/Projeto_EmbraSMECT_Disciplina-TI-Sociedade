@@ -7,6 +7,16 @@ O EmbraSMECT usa uma arquitetura simples em camadas:
 - **Banco de dados:** scripts SQL com tabelas e dados iniciais.
 
 O frontend acessa o backend por HTTP usando Axios. O backend pode ser executado separadamente na porta 3000. Nesta primeira versão, a API mantém reservas em memória para facilitar o uso acadêmico; os scripts SQL representam o modelo persistente planejado.
+
+### Variáveis de ambiente
+
+- `PORT` define a porta usada pelo Express. O desenvolvimento usa `5000` para evitar conflito com a porta `3000`; o Railway fornece esse valor em produção.
+- `JWT_SECRET` assina e valida os tokens de autenticação.
+- `DATABASE_URL` representa a futura conexão com o banco; ainda não é usada pelo repositório em memória.
+- `FRONTEND_URL` informa ao CORS qual frontend principal pode acessar a API.
+- `VITE_API_URL` é usada pelo Vite para apontar o cliente Axios ao backend local ou publicado.
+
+No desenvolvimento, o frontend pode usar `frontend2/.env.local` com `VITE_API_URL=http://localhost:5000`. Na Vercel, use `VITE_API_URL` com a URL pública do backend no Railway, sem colocar segredos no frontend.
 ```text
 EmbraSMECT/
 |
