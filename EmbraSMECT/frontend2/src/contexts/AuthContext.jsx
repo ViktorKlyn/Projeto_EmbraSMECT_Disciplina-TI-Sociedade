@@ -10,7 +10,8 @@ export function AuthProvider({ children }) {
   // Envia as credenciais para o backend e guarda a sessão localmente.
   async function login(email, senha) {
     const { data } = await api.post('/login', { email, senha });
-    setUser(data.usuario);
+    // Guarda também o papel e a marcação de administrador principal para controlar a interface.
+    setUser({ id: data.usuario.id, nome: data.usuario.nome, email: data.usuario.email, role: data.usuario.role, principal: Boolean(data.usuario.principal) });
     sessionStorage.setItem('embrasmect_token', data.token);
   }
 

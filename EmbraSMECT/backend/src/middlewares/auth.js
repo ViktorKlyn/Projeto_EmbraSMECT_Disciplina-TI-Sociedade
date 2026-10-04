@@ -25,5 +25,12 @@ export function exigirAutenticacao(req, res, next) {
 
 // Cria um token com os dados mínimos necessários no frontend.
 export function criarToken(usuario) {
-  return jwt.sign({ id: usuario.id, email: usuario.email, nome: usuario.nome }, jwtSecret, { expiresIn: '2h' });
+  // Inclui o papel e o nível administrativo para que as rotas possam autorizar ações.
+  return jwt.sign({
+    id: usuario.id,
+    email: usuario.email,
+    nome: usuario.nome,
+    role: usuario.role,
+    principal: Boolean(usuario.principal),
+  }, jwtSecret, { expiresIn: '2h' });
 }

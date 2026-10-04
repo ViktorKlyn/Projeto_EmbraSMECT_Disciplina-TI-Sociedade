@@ -5,6 +5,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import reservaRoutes from './routes/reserva.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import usuariosRoutes from './routes/usuarios.routes.js';
+import publicEventRoutes from './routes/public-event.routes.js';
 import { logger } from './middlewares/logger.js';
 import { exigirAutenticacao } from './middlewares/auth.js';
 
@@ -60,7 +62,9 @@ app.get('/api/status', (req, res) => {
 
 // Login é público; as rotas de reservas passam antes pelo middleware JWT.
 app.use('/api/login', authRoutes);
+app.use('/api/eventos', publicEventRoutes);
 app.use('/api/reservas', exigirAutenticacao, reservaRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 
 // PORT vem do ambiente, como o valor fornecido pelo Railway.
 // No desenvolvimento, 5000 evita disputar a porta 3000 com outro processo.
