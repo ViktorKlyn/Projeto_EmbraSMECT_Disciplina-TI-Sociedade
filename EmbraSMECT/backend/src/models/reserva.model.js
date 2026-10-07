@@ -4,6 +4,7 @@ export function criarReserva(dados, id) {
     id,
     codigo: `EVT-${String(id).padStart(6, '0')}`,
     nome: dados.nome.trim(),
+    descricao: dados.descricao || '',
     usuarioId: Number(dados.usuarioId),
     usuarioNome: dados.usuarioNome,
     criadorRole: dados.role,

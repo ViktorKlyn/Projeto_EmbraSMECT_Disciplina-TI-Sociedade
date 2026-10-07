@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 // Tela pública que coleta as credenciais e inicia a sessão.
@@ -24,11 +24,10 @@ export default function Login() {
 
   return <div className="login-page"><form className="login-card" onSubmit={handleSubmit}>
     <span className="eyebrow">PORTAL DE EVENTOS</span><h1>Acesso</h1>
-    <p>Entre para gerenciar reservas ou consultar os detalhes do evento.</p>
+    <p>Acesso exclusivo para administradores e organizadores.</p>
     <label>Usuário<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
     <label>Senha<input type="password" value={senha} onChange={(event) => setSenha(event.target.value)} required /></label>
     {erro && <div className="error">{erro}</div>}
     <button className="primary-button" type="submit">Entrar</button>
-    <p className="login-signup-prompt">É convidado e ainda não tem acesso? <Link to="/cadastro">Cadastre-se</Link></p>
   </form></div>;
 }

@@ -5,6 +5,7 @@ import EventShare from '../components/EventShare';
 
 const initialForm = {
   nome: '',
+  descricao: '',
   data: '',
   horaInicio: '',
   horaFim: '',
@@ -68,7 +69,7 @@ export default function Reservas() {
         setSalas(data);
         setForm((atual) => ({ ...atual, sala: atual.sala || data[0]?.nome || '' }));
       })
-      .catch(() => setErro('Não foi possível carregar as reservas e salas.'));
+      .catch(() => setErro('Não foi possível carregar as reservas e espaços.'));
   }, []);
 
   const salaSelecionada = salas.find((sala) => sala.nome === form.sala);
@@ -112,8 +113,8 @@ export default function Reservas() {
       setForm(initialForm);
       setRecursoAtual('');
       setMensagem(user?.role === 'admin'
-        ? `Evento aprovado. Código para a ficha: ${eventoCriado.codigo}.`
-        : `Solicitação enviada para aprovação do ADM. Código da ficha: ${eventoCriado.codigo}.`);
+        ? `Evento aprovado. A página do convidado está disponível no link de acesso do evento ${eventoCriado.codigo}.`
+        : `Solicitação enviada para aprovação do ADM. A página do convidado ${eventoCriado.codigo} ficará disponível após a aprovação.`);
       await carregar();
     } catch (requestError) {
       setErro(requestError.response?.data?.erro || 'Não foi possível enviar a solicitação.');
@@ -139,6 +140,7 @@ export default function Reservas() {
     setEdicao({
       id: reserva.id,
       nome: reserva.nome,
+      descricao: reserva.descricao || '',
       data: reserva.data,
       horaInicio: reserva.horaInicio,
       horaFim: reserva.horaFim,
@@ -238,16 +240,17 @@ export default function Reservas() {
     <div className="page-heading">
       <span className="eyebrow">{user?.role === 'admin' ? 'GESTÃO DE EVENTOS' : 'ÁREA DO ORGANIZADOR'}</span>
       <h1>{user?.role === 'admin' ? 'Reservas' : 'Minhas reservas'}</h1>
-      <p>{user?.role === 'admin' ? 'Cadastre eventos e acompanhe todas as solicitações.' : 'Solicite eventos, acompanhe suas decisões e consulte a ocupação das salas.'}</p>
+      <p>{user?.role === 'admin' ? 'Cadastre eventos e acompanhe todas as solicitações.' : 'Solicite eventos, acompanhe suas decisões e consulte a ocupação dos espaços.'}</p>
     </div>
 
     <form className="form-panel booking-form" onSubmit={handleSubmit}>
       <label>Nome do evento<input value={form.nome} onChange={(event) => setForm({ ...form, nome: event.target.value })} maxLength="160" placeholder="Ex.: Encontro de inovação" required /></label>
+      <label>Descrição do evento (opcional)<textarea value={form.descricao} onChange={(event) => setForm({ ...form, descricao: event.target.value })} maxLength="2000" rows="4" placeholder="Apresente o evento e o que os participantes podem esperar." /></label>
       <label>Data<input type="text" inputMode="numeric" autoComplete="off" placeholder="DD/MM/AAAA" maxLength="10" value={form.data} onChange={(event) => setForm({ ...form, data: mascararData(event.target.value) })} required /></label>
       <label>Horário de início<input type="time" value={form.horaInicio} onChange={(event) => setForm({ ...form, horaInicio: event.target.value })} required /></label>
       <label>Horário de término<input type="time" value={form.horaFim} onChange={(event) => setForm({ ...form, horaFim: event.target.value })} required min={form.horaInicio || undefined} /></label>
-      <label>Sala<select value={form.sala} onChange={(event) => setForm({ ...form, sala: event.target.value, unirSalas: false })} required disabled={salas.length === 0}><option value="" disabled>Selecione uma sala</option>{salas.map((sala) => <option key={sala.id} value={sala.nome}>{sala.nome} · {sala.capacidade} lugares</option>)}</select></label>
-      {salaConjugada && <label className="seat-management-toggle"><input type="checkbox" checked={Boolean(form.unirSalas)} onChange={(event) => setForm({ ...form, unirSalas: event.target.checked })} /><span><strong>Unir com {salaConjugada.nome}</strong><small>Capacidade conjunta: {salaSelecionada.capacidade + salaConjugada.capacidade} pessoas.</small></span></label>}
+      <label>Espaço<select value={form.sala} onChange={(event) => setForm({ ...form, sala: event.target.value, unirSalas: false })} required disabled={salas.length === 0}><option value="" disabled>Selecione um espaço</option>{salas.map((sala) => <option key={sala.id} value={sala.nome}>{sala.nome} · {sala.capacidade} lugares</option>)}</select></label>
+      {salaConjugada && <label className="seat-management-toggle"><input type="checkbox" checked={Boolean(form.unirSalas)} onChange={(event) => setForm({ ...form, unirSalas: event.target.checked })} /><span><strong>Unir com {salaConjugada.nome}</strong><small>Capacidade total: {salaSelecionada.capacidade + salaConjugada.capacidade} pessoas.</small></span></label>}
       <div className="technical-resources-field">
         <label htmlFor="technical-resource">Recursos técnicos</label>
         <div className="technical-resource-entry">
@@ -282,7 +285,7 @@ export default function Reservas() {
       {reservas.length === 0 && <p className="empty">Ainda não há reservas para exibir.</p>}
       {reservas.map((reserva) => <article className="reservation-item" key={reserva.id}>
         <div className="reservation-top">
-          <div><strong>{reserva.nome}</strong><small>{reserva.codigo} · {reserva.sala} · {formatarData(reserva.data)} · {reserva.horaInicio}–{reserva.horaFim} · {reserva.recurso}</small></div>
+          <div><strong>{reserva.nome}</strong><small>{reserva.codigo} · Espaço {reserva.sala} · {formatarData(reserva.data)} · {reserva.horaInicio} – {reserva.horaFim} · {reserva.recurso}</small></div>
           <span className={`status ${reserva.status}`}>{reserva.status}</span>
         </div>
         {reserva.usuarioId === Number(user?.id) && <EventShare codigo={reserva.codigo} />}
@@ -292,14 +295,15 @@ export default function Reservas() {
         </div>}
         {edicao?.id === reserva.id && <form className="form-panel booking-form reservation-edit-form" onSubmit={salvarEdicao}>
           <label>Nome do evento<input value={edicao.nome} onChange={(event) => setEdicao({ ...edicao, nome: event.target.value })} maxLength="160" required /></label>
+          <label>Descrição do evento (opcional)<textarea value={edicao.descricao} onChange={(event) => setEdicao({ ...edicao, descricao: event.target.value })} maxLength="2000" rows="4" placeholder="Apresente o evento e o que os participantes podem esperar." /></label>
           <label>Data<input type="date" min={dataAtualISO()} value={edicao.data} onChange={(event) => setEdicao({ ...edicao, data: event.target.value })} required /></label>
           <label>Horário de início<input type="time" value={edicao.horaInicio} onChange={(event) => setEdicao({ ...edicao, horaInicio: event.target.value })} required /></label>
           <label>Horário de término<input type="time" value={edicao.horaFim} min={edicao.horaInicio || undefined} onChange={(event) => setEdicao({ ...edicao, horaFim: event.target.value })} required /></label>
-          <label>Sala<select value={edicao.sala} onChange={(event) => setEdicao({ ...edicao, sala: event.target.value, unirSalas: false })} required>{salas.map((sala) => <option key={sala.id} value={sala.nome}>{sala.nome} · {sala.capacidade} lugares</option>)}</select></label>
+          <label>Espaço<select value={edicao.sala} onChange={(event) => setEdicao({ ...edicao, sala: event.target.value, unirSalas: false })} required>{salas.map((sala) => <option key={sala.id} value={sala.nome}>{sala.nome} · {sala.capacidade} lugares</option>)}</select></label>
           {(() => {
             const salaEditada = salas.find((sala) => sala.nome === edicao.sala);
             const conjugadaEditada = salas.find((sala) => sala.id === salaEditada?.conjugadaId);
-            return conjugadaEditada && <label className="seat-management-toggle"><input type="checkbox" checked={Boolean(edicao.unirSalas)} onChange={(event) => setEdicao({ ...edicao, unirSalas: event.target.checked })} /><span><strong>Unir com {conjugadaEditada.nome}</strong><small>Capacidade conjunta: {salaEditada.capacidade + conjugadaEditada.capacidade} pessoas.</small></span></label>;
+            return conjugadaEditada && <label className="seat-management-toggle"><input type="checkbox" checked={Boolean(edicao.unirSalas)} onChange={(event) => setEdicao({ ...edicao, unirSalas: event.target.checked })} /><span><strong>Unir com {conjugadaEditada.nome}</strong><small>Capacidade total: {salaEditada.capacidade + conjugadaEditada.capacidade} pessoas.</small></span></label>;
           })()}
           <div className="technical-resources-field">
             <label htmlFor={`edit-resource-${reserva.id}`}>Recursos técnicos</label>

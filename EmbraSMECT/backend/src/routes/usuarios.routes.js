@@ -16,7 +16,7 @@ import {
   removerSala,
   removerUsuario,
 } from '../repositories/usuario.repository.js';
-import { salaEmUso } from '../repositories/reserva.repository.js';
+import { renomearEspaco, salaEmUso } from '../repositories/reserva.repository.js';
 
 const router = Router();
 const emailValido = /^\S+@\S+\.\S+$/;
@@ -72,36 +72,44 @@ router.post('/organizadores', async (req, res) => {
 });
 
 router.post('/salas', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode criar salas.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode criar espaços.' });
 
   const nome = typeof req.body.nome === 'string' ? req.body.nome.trim() : '';
   const capacidade = Number(req.body.capacidade);
 
   if (!nome || nome.length < 2 || !Number.isFinite(capacidade) || capacidade < 1 || capacidade > 500) {
-    return res.status(400).json({ erro: 'Informe nome da sala e capacidade válida entre 1 e 500.' });
+    return res.status(400).json({ erro: 'Informe nome do espaço e capacidade válida entre 1 e 500.' });
   }
 
   const sala = adicionarSala({ nome, capacidade });
-  if (!sala) return res.status(400).json({ erro: 'Não foi possível criar a sala.' });
+  if (!sala) return res.status(400).json({ erro: 'Não foi possível criar o espaço.' });
 
   return res.status(201).json({ sala });
 });
 
 router.delete('/salas/:id', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode excluir salas.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode excluir espaços.' });
 
   const sala = listarSalas().find((item) => item.id === Number(req.params.id));
-  if (!sala) return res.status(404).json({ erro: 'Sala não encontrada.' });
-  if (salaEmUso(sala.nome)) return res.status(409).json({ erro: 'Esta sala não pode ser removida porque está vinculada a uma reserva.' });
+  if (!sala) return res.status(404).json({ erro: 'Espaço não encontrado.' });
+  if (salaEmUso(sala.nome)) return res.status(409).json({ erro: 'Este espaço não pode ser removido porque está vinculado a uma reserva.' });
 
   const removida = removerSala(sala.id);
-  if (!removida) return res.status(404).json({ erro: 'Não foi possível remover a sala.' });
+  if (!removida) return res.status(404).json({ erro: 'Não foi possível remover o espaço.' });
 
   return res.json({ sala: removida });
 });
 
+router.patch('/salas/:id/nome', (req, res) => {
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode alterar espaços.' });
+
+  const resultado = renomearEspaco(req.params.id, req.body.nome);
+  if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
+  return res.json({ sala: resultado.espaco });
+});
+
 router.patch('/salas/:id', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode alterar salas.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode alterar espaços.' });
 
   const capacidade = req.body.capacidade;
   if (!Number.isInteger(Number(capacidade)) || Number(capacidade) < 1 || Number(capacidade) > 500) {
@@ -109,17 +117,17 @@ router.patch('/salas/:id', (req, res) => {
   }
 
   const sala = atualizarCapacidadeSala(req.params.id, capacidade);
-  if (!sala) return res.status(404).json({ erro: 'Sala não encontrada.' });
+  if (!sala) return res.status(404).json({ erro: 'Espaço não encontrado.' });
 
   return res.json({ sala });
 });
 
 router.patch('/salas/:id/conjugada', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode configurar salas conjugadas.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode configurar espaços para uso conjunto.' });
 
   const conjugadaId = req.body.conjugadaId === null ? null : Number(req.body.conjugadaId);
   if (conjugadaId !== null && (!Number.isInteger(conjugadaId) || conjugadaId < 1)) {
-    return res.status(400).json({ erro: 'Selecione uma sala conjugada válida ou nenhuma.' });
+    return res.status(400).json({ erro: 'Selecione um espaço válido para uso conjunto ou nenhum.' });
   }
 
   const resultado = configurarSalasConjugadas(req.params.id, conjugadaId);

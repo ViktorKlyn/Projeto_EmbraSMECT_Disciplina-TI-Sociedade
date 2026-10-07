@@ -4,11 +4,13 @@ import {
   atualizarReserva as atualizarReservaRepo,
   buscarReservaPorId,
   buscarEventoPorCodigo as buscarEventoPorCodigoRepo,
+  buscarEventoInscritoPorCodigo as buscarEventoInscritoPorCodigoRepo,
   decidirReserva as decidirReservaRepo,
   inscreverConvidado as inscreverConvidadoRepo,
   inscreverConvidadoPublico as inscreverConvidadoPublicoRepo,
   buscarEventosDisponiveis as buscarEventosDisponiveisRepo,
   listarReservas,
+  listarEventosInscritos,
   listarReservasRelatorio,
   listarEventosTV,
   removerReserva as removerReservaRepo,
@@ -19,6 +21,10 @@ import { buscarSalaPorNome, buscarUsuarioPorEmail } from '../repositories/usuari
 // A camada de serviço concentra as regras antes do acesso aos dados.
 export function buscarReservas(usuario) {
   return listarReservas(usuario);
+}
+
+export function buscarEventosInscritos(usuario) {
+  return listarEventosInscritos(usuario);
 }
 
 export function buscarRelatorios(usuario) {
@@ -33,6 +39,7 @@ export function buscarEventoPublico(codigo) {
   const evento = buscarEventoPorCodigoRepo(codigo);
   if (!evento) return null;
   const {
+    id,
     codigo: codigoEvento,
     nome,
     data,
@@ -49,8 +56,10 @@ export function buscarEventoPublico(codigo) {
     participantes,
   } = evento;
   return {
+    id,
     codigo: codigoEvento,
     nome,
+    descricao: evento.descricao || '',
     data,
     horaInicio,
     horaFim,
@@ -64,6 +73,15 @@ export function buscarEventoPublico(codigo) {
     capacidadeSala,
     participantes,
   };
+}
+
+export function buscarEventoInscritoPorCodigo(codigo, usuario) {
+  const evento = buscarEventoPorCodigoRepo(codigo);
+  if (!evento) return { erro: 'Evento não encontrado.', status: 404 };
+
+  const inscricao = buscarEventoInscritoPorCodigoRepo(codigo, usuario);
+  if (!inscricao) return { erro: 'Esta conta não está inscrita neste evento.', status: 403 };
+  return { evento: inscricao };
 }
 
 export function inscreverConvidadoPublico(codigo, dados) {
@@ -124,9 +142,9 @@ function validarEDadosReserva(dados) {
     .map((nomeSala) => nomeSala.trim())
     .filter(Boolean))];
   if (!dataIsoValida(dados.data) || nomesSalas.length === 0 || recursos.length === 0 || typeof dados.nome !== 'string' || dados.nome.trim().length < 2 || dados.nome.trim().length > 160) {
-    throw new Error('Informe nome do evento, data válida, sala e pelo menos um recurso técnico.');
+    throw new Error('Informe nome do evento, data válida, espaço e pelo menos um recurso técnico.');
   }
-  if (nomesSalas.length > 2) throw new Error('Um evento pode ocupar no máximo duas salas conjugadas.');
+  if (nomesSalas.length > 2) throw new Error('Um evento pode ocupar no máximo dois espaços unidos.');
   if (dados.data < dataAtualISO()) {
     throw new Error('Não é possível criar ou alterar eventos em datas passadas.');
   }
@@ -135,18 +153,22 @@ function validarEDadosReserva(dados) {
   }
 
   const salasSelecionadas = nomesSalas.map(buscarSalaPorNome);
-  if (salasSelecionadas.some((sala) => !sala)) throw new Error('Selecione uma sala válida.');
+  if (salasSelecionadas.some((sala) => !sala)) throw new Error('Selecione um espaço válido.');
   if (nomesSalas.length === 2 && (
     salasSelecionadas[0].conjugadaId !== salasSelecionadas[1].id
     || salasSelecionadas[1].conjugadaId !== salasSelecionadas[0].id
   )) {
-    throw new Error('As salas selecionadas não estão configuradas como conjugadas.');
+    throw new Error('Os espaços selecionados não estão configurados para uso conjunto.');
   }
   if (!horarioValido(dados.horaInicio) || !horarioValido(dados.horaFim) || dados.horaFim <= dados.horaInicio) {
     throw new Error('Informe horários válidos e um horário de término posterior ao início.');
   }
   if (typeof dados.palestrante !== 'string' || !dados.palestrante.trim() || dados.palestrante.trim().length > 160) {
     throw new Error('Informe o nome do palestrante.');
+  }
+  const descricao = typeof dados.descricao === 'string' ? dados.descricao.trim() : '';
+  if (descricao.length > 2000) {
+    throw new Error('A descrição do evento deve ter no máximo 2000 caracteres.');
   }
 
   const [inicioHora, inicioMinuto] = dados.horaInicio.split(':').map(Number);
@@ -159,12 +181,13 @@ function validarEDadosReserva(dados) {
     horaFim: dados.horaFim,
     ignorarId: dados.id,
   })) {
-    const error = new Error('Uma das salas selecionadas já está reservada nesse horário.');
+    const error = new Error('Um dos espaços selecionados já está reservado nesse horário.');
     error.status = 409;
     throw error;
   }
   return {
     nome: dados.nome.trim(),
+    descricao,
     data: dados.data,
     horaInicio: dados.horaInicio,
     horaFim: dados.horaFim,

@@ -27,7 +27,7 @@ export default function Layout() {
         {(isAdmin || isOrganizer) && <NavLink to="/relatorios">Relatórios</NavLink>}
         {(isAdmin || isOrganizer) && <NavLink to="/tv">Exibição para TV</NavLink>}
         {isAdmin && <NavLink to="/usuarios">Contas</NavLink>}
-        {isAdmin && user?.principal === true && <NavLink to="/recursos-sala">Recursos de sala</NavLink>}
+        {isAdmin && user?.principal === true && <NavLink to="/recursos-sala">Espaços</NavLink>}
         {isGuest && <NavLink to="/meu-evento">Meu evento</NavLink>}
       </nav>
       <main className="content"><Outlet /></main>

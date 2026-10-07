@@ -4,6 +4,8 @@ import {
 	getEventosTV,
 	getRelatorios,
 	getReservas,
+	getEventosInscritos,
+	getEventoInscrito,
 	deleteEvento,
 	patchAssento,
 	patchEvento,
@@ -15,17 +17,27 @@ import { listarSalas } from '../repositories/usuario.repository.js';
 
 const router = Router();
 
+router.get('/evento/:codigo/convidado', (req, res, next) => {
+	if (req.usuario.role === 'guest') return next();
+	return res.status(403).json({ erro: 'Somente convidados podem acessar esta página.' });
+}, getEventoInscrito);
+
 router.get('/salas', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') {
 		return res.json(listarSalas());
 	}
-	return res.status(403).json({ erro: 'Somente ADM ou organizadores podem consultar as salas.' });
+	return res.status(403).json({ erro: 'Somente ADM ou organizadores podem consultar os espaços.' });
 });
 
 router.get('/ficha', (req, res, next) => {
-	if (req.usuario.role === 'guest') return next();
-	return res.status(403).json({ erro: 'Somente convidados podem consultar eventos para inscrição.' });
+	if (['guest', 'admin', 'organizer'].includes(req.usuario.role)) return next();
+	return res.status(403).json({ erro: 'Papel de usuário sem permissão para consultar eventos disponíveis.' });
 }, getEventosDisponiveis);
+
+router.get('/inscricoes', (req, res, next) => {
+	if (['guest', 'admin', 'organizer'].includes(req.usuario.role)) return next();
+	return res.status(403).json({ erro: 'Papel de usuário sem permissão para consultar inscrições.' });
+}, getEventosInscritos);
 
 router.get('/relatorios', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
@@ -48,8 +60,8 @@ router.delete('/:id', (req, res, next) => {
 }, deleteEvento);
 
 router.post('/:id/inscricoes', (req, res, next) => {
-	if (req.usuario.role === 'guest') return next();
-	return res.status(403).json({ erro: 'Somente convidados podem se inscrever.' });
+	if (['guest', 'admin', 'organizer'].includes(req.usuario.role)) return next();
+	return res.status(403).json({ erro: 'Papel de usuário sem permissão para se inscrever.' });
 }, postInscricao);
 
 router.patch('/:id/inscricoes/:convidadoId/assento', (req, res, next) => {

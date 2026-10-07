@@ -2,6 +2,7 @@ import {
   atribuirAssento,
   buscarRelatorios,
   buscarReservas,
+  buscarEventosInscritos,
   buscarEventosTV,
   criarNovaReserva,
   decidirReserva,
@@ -10,12 +11,17 @@ import {
   inscreverConvidado,
   buscarEventosDisponiveis,
   buscarEventoPublico,
+  buscarEventoInscritoPorCodigo,
   inscreverConvidadoPublico,
 } from '../services/reserva.service.js';
 
 // Retorna as reservas disponíveis para o frontend.
 export function getReservas(req, res) {
   res.json(buscarReservas(req.usuario));
+}
+
+export function getEventosInscritos(req, res) {
+  res.json(buscarEventosInscritos(req.usuario));
 }
 
 export function getRelatorios(req, res) {
@@ -30,6 +36,12 @@ export function getEventoPublico(req, res) {
   const evento = buscarEventoPublico(req.params.codigo);
   if (!evento) return res.status(404).json({ erro: 'Evento não encontrado.' });
   return res.json(evento);
+}
+
+export function getEventoInscrito(req, res) {
+  const resultado = buscarEventoInscritoPorCodigo(req.params.codigo, req.usuario);
+  if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
+  return res.json(resultado.evento);
 }
 
 export function postInscricaoPublica(req, res) {

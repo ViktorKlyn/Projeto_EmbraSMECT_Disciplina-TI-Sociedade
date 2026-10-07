@@ -81,7 +81,7 @@ export default function TVDisplay() {
     <div className="tv-event-list">
       {eventos.map((evento) => <article className="tv-event" key={evento.id}>
         <p className="tv-date">{formatarData(evento.data)}</p>
-        <div><h2>{evento.nome}</h2><p>{evento.codigo} · {evento.sala} · {evento.horaInicio}–{evento.horaFim} · {evento.palestrante}</p></div>
+        <div><h2>{evento.nome}</h2><p>{evento.codigo} · Espaço {evento.sala} · {evento.horaInicio} – {evento.horaFim} · {evento.palestrante}</p></div>
         <div className="tv-event-meta"><span>{evento.duracaoMinutos} min</span><span>{evento.participantes} participantes</span></div>
       </article>)}
     </div>

@@ -1,6 +1,6 @@
 # EmbraSMECT
 
-Projeto acadêmico simples para gerenciamento de reservas de salas e recursos.
+Projeto acadêmico simples para gerenciamento de eventos, espaços e recursos.
 
 ## Requisitos
 
@@ -53,6 +53,8 @@ O Vite lê `VITE_API_URL` durante o desenvolvimento e o cliente Axios acrescenta
 
 Em produção na Vercel, configure `VITE_API_URL` nas Environment Variables do projeto com a URL pública do backend. Configure também no backend as variáveis `JWT_SECRET`, `PORT` e `FRONTEND_URL` com os valores da hospedagem.
 
+O frontend de convidados é um projeto Vercel independente em `frontend-convidado`. Configure nele `VITE_API_URL` com a URL pública do backend. No projeto Vercel do portal de gestão, configure `VITE_GUEST_APP_URL` com o domínio publicado do frontend de convidados para que os links e QR codes dos eventos levem ao projeto correto.
+
 ## Contas de demonstração
 
 As contas abaixo são fictícias e servem apenas para testar os perfis. A senha comum é `EmbraTeste@2026`.
@@ -64,22 +66,24 @@ As contas abaixo são fictícias e servem apenas para testar os perfis. A senha 
 | Convidado | `lia.mendes@embrasmect.test` |
 | Convidado | `caio.freitas@embrasmect.test` |
 
-As contas ADM existentes continuam disponíveis com as credenciais anteriores. Usuários, salas, reservas, inscrições e assentos são persistidos localmente em `backend/data/app-data.json`, inclusive após reiniciar o backend. Não use essas contas ou senhas em produção. Em hospedagens cuja unidade de disco é temporária, configure armazenamento persistente ou defina `EMBRASMECT_DATA_FILE` para um volume durável.
+As contas ADM existentes continuam disponíveis com as credenciais anteriores. Usuários, espaços, reservas, inscrições e assentos são persistidos localmente em `backend/data/app-data.json`, inclusive após reiniciar o backend. Não use essas contas ou senhas em produção. Em hospedagens cuja unidade de disco é temporária, configure armazenamento persistente ou defina `EMBRASMECT_DATA_FILE` para um volume durável.
 
-O organizador vê somente as próprias solicitações; nos relatórios, também pode consultar eventos criados pelo ADM. Os relatórios mostram o nome do evento e do organizador. O organizador e o ADM podem abrir a exibição para TV em `/tv`. Somente o ADM principal pode ver os e-mails dos convidados inscritos. Quem cadastrou o evento pode alterá-lo ou excluí-lo na tela **Reservas**; a exclusão também remove as inscrições vinculadas. O brinde ao final é opcional. O total de participantes e a ocupação são calculados pelas inscrições efetivas, limitadas pela capacidade da sala. O convidado vê eventos aprovados em que se inscreveu. A gestão de assentos é opcional por evento; quando ativada, o organizador atribui assentos individuais.
+O organizador vê somente as próprias solicitações na tela Reservas; nos relatórios, pode consultar todos os eventos e abrir a página de qualquer um deles para se inscrever com a própria conta. ADM também pode abrir eventos e se inscrever. Cada usuário consulta apenas as próprias inscrições, sem acesso à lista de participantes de eventos de outros organizadores. Somente o ADM principal pode ver os e-mails dos convidados inscritos. Quem cadastrou o evento pode alterá-lo ou excluí-lo na tela **Reservas**; a exclusão também remove as inscrições vinculadas. O brinde ao final é opcional. O total de participantes e a ocupação são calculados pelas inscrições efetivas, limitadas pela capacidade do espaço. O convidado vê eventos aprovados em que se inscreveu. A gestão de assentos é opcional por evento; quando ativada, o organizador atribui assentos individuais.
 
 Reservas criadas por ADM entram diretamente como aprovadas. Reservas solicitadas por organizadores continuam aguardando a aprovação do ADM. Eventos não podem ser criados ou alterados para datas passadas. Quem cadastrou um evento pode alterar seus dados ou excluí-lo na tela Reservas. O brinde ao final é opcional.
 
-Cada evento recebe um código público sequencial, como `EVT-000001`, exige horários de início e término no mesmo dia (a duração é calculada automaticamente) e aceita até 10 recursos técnicos. Depois de criado, o evento tem uma página pública em `/evento/<código>`, com detalhes, QR code e inscrição sem autenticação. Convidados já cadastrados informam o e-mail para se inscrever; novos participantes informam nome e e-mail, sem criar senha. A página fica disponível enquanto o evento aguarda aprovação, mas só aceita inscrições após ser aprovado. O ADM principal configura pares de salas conjugadas em **Recursos de sala**; ao criar ou editar um evento, o usuário pode optar por ocupar as duas salas. A capacidade do evento será a soma das capacidades, e as salas compartilhadas não podem ter eventos simultâneos. O link e o QR code também aparecem na tela **Reservas** para compartilhamento.
+Cada evento recebe um código público sequencial, como `EVT-000001`, permite uma descrição opcional de até 2000 caracteres, exige horários de início e término no mesmo dia (a duração é calculada automaticamente) e aceita até 10 recursos técnicos. Depois de criado, o evento tem uma página pública de inscrição em `/evento/<código>` e uma página exclusiva do convidado em `/evento/<código>/acesso`. O organizador compartilha o link e o QR code da página exclusiva pela tela **Reservas**. A página de acesso exige uma conta de convidado e só mostra a programação após confirmar que essa conta está inscrita no evento. Convidados já cadastrados informam o e-mail para se inscrever; novos participantes informam nome e e-mail, sem criar senha. A página pública de inscrição fica disponível enquanto o evento aguarda aprovação, mas só aceita inscrições após ser aprovado. O ADM principal gerencia espaços na opção **Espaços**; ao criar ou editar um evento, o usuário pode optar por unir dois espaços configurados para uso conjunto. A capacidade do evento será a soma das capacidades, e os espaços compartilhados não podem ter eventos simultâneos.
 
 ## Gestão de acessos
 
+- A sessão permanece ativa ao recarregar a página enquanto o token de acesso estiver válido (2 horas); depois disso, é necessário entrar novamente.
+- ADM e organizadores entram pela tela de gestão (`/login`); convidados entram pela página exclusiva do evento usando a conta de convidado cadastrada.
 - ADM cadastra gestores na tela **Contas** (`/usuarios`) e pode promover um organizador a ADM.
-- O ADM principal pode rebaixar ou excluir outros ADMs, além de cadastrar salas, editar capacidades, configurar pares de salas conjugadas e remover salas sem reservas vinculadas na opção **Recursos de sala** da navegação.
+- O ADM principal pode rebaixar ou excluir outros ADMs, além de cadastrar e renomear espaços, editar capacidades, configurar pares de espaços para uso conjunto e remover espaços sem reservas vinculadas na opção **Espaços** da navegação. Renomear um espaço também atualiza os eventos já vinculados a ele.
 - O cadastro público em `/cadastro` sempre cria um convidado; o papel enviado pelo navegador não é aceito.
 - Após uma promoção, o usuário precisa entrar novamente para receber um token com o novo papel.
 - Os dados da aplicação são gravados em arquivo local. Para executar mais de uma instância do backend ou publicar em um ambiente sem disco persistente, configure um armazenamento compartilhado durável antes de usar.
 
 ## Banco de dados
 
-Para uma base nova, execute `database/schema.sql` e depois `database/seed.sql`. Em uma base existente, aplique as migrações ainda não executadas na pasta `database/migrations`, incluindo `003_detalhes_evento.sql`, `004_inscricoes_assentos.sql` e `005_nome_codigo_evento.sql`.
+Para uma base nova, execute `database/schema.sql` e depois `database/seed.sql`. Em uma base existente, aplique as migrações ainda não executadas na pasta `database/migrations`, incluindo `003_detalhes_evento.sql`, `004_inscricoes_assentos.sql`, `005_nome_codigo_evento.sql` e `006_descricao_evento.sql`.

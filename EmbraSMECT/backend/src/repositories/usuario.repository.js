@@ -61,11 +61,11 @@ export function buscarSalaPorNome(nome) {
 
 export function configurarSalasConjugadas(id, conjugadaId) {
   const sala = salas.find((item) => item.id === Number(id));
-  if (!sala) return { erro: 'Sala não encontrada.', status: 404 };
+  if (!sala) return { erro: 'Espaço não encontrado.', status: 404 };
 
   const novaConjugada = conjugadaId === null ? null : salas.find((item) => item.id === Number(conjugadaId));
-  if (conjugadaId !== null && !novaConjugada) return { erro: 'Sala conjugada não encontrada.', status: 404 };
-  if (novaConjugada?.id === sala.id) return { erro: 'Uma sala não pode ser conjugada com ela mesma.', status: 400 };
+  if (conjugadaId !== null && !novaConjugada) return { erro: 'Espaço para uso conjunto não encontrado.', status: 404 };
+  if (novaConjugada?.id === sala.id) return { erro: 'Um espaço não pode ser unido a ele mesmo.', status: 400 };
 
   const salaAnterior = salas.find((item) => item.id === sala.conjugadaId);
   if (salaAnterior?.conjugadaId === sala.id) salaAnterior.conjugadaId = null;

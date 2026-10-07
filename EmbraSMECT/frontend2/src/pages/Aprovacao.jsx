@@ -31,7 +31,7 @@ export default function Aprovacao() {
       {reservas.length === 0 && <p className="empty">Nenhum pedido aguardando aprovação.</p>}
       {reservas.map((reserva) => <article className="approval-card" key={reserva.id}>
         <div className="reservation-top">
-          <div><strong>{reserva.nome}</strong><small>{reserva.codigo} · {reserva.sala} · {reserva.data} · {reserva.horaInicio}–{reserva.horaFim} · {reserva.recurso}</small></div>
+          <div><strong>{reserva.nome}</strong><small>{reserva.codigo} · Espaço {reserva.sala} · {reserva.data} · {reserva.horaInicio} – {reserva.horaFim} · {reserva.recurso}</small></div>
           <span className="status pendente">Pendente</span>
         </div>
         <div className="reservation-details">

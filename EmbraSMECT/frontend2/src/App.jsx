@@ -12,11 +12,21 @@ import TVDisplay from './pages/TVDisplay';
 import AdminUsers from './pages/AdminUsers';
 import RoomResources from './pages/RoomResources';
 import GuestSignup from './pages/GuestSignup';
+import GuestEventAccess from './pages/GuestEventAccess';
 import PublicEvent from './pages/PublicEvent';
 
 // Redireciona visitantes não autenticados para a tela de login.
 function PrivateRoutes() {
-  const { user } = useAuth();
+  const { user, isLoading, authError, restoreSession } = useAuth();
+  if (isLoading) return <main className="content"><p>Restaurando sessão...</p></main>;
+  if (authError) {
+    return (
+      <main className="content">
+        <div className="error" role="alert">{authError}</div>
+        <button className="primary-button" onClick={restoreSession}>Tentar novamente</button>
+      </main>
+    );
+  }
   return user ? <Layout /> : <Navigate to="/login" replace />;
 }
 
@@ -34,6 +44,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/cadastro" element={<GuestSignup />} />
       <Route path="/evento/:codigo" element={<PublicEvent />} />
+      <Route path="/evento/:codigo/acesso" element={<GuestEventAccess />} />
       <Route element={<PrivateRoutes />}>
         <Route path="/" element={<Home />} />
         <Route element={<RoleRoute roles={['admin', 'organizer']} />}>

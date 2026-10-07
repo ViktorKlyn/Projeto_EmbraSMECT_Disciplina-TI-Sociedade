@@ -16,6 +16,7 @@ CREATE TABLE salas (
 CREATE TABLE reservas (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nome VARCHAR(160) NOT NULL,
+    descricao TEXT NULL,
     codigo VARCHAR(20) NOT NULL UNIQUE,
     usuario_id INT NOT NULL,
     sala_id INT NOT NULL,

@@ -1537,6 +1537,12 @@ textarea:focus {
 	padding: 0 0 56px;
 }
 
+.guest-event-login-wrap {
+	display: flex;
+	justify-content: center;
+	padding: 28px 0;
+}
+
 .public-event-header {
 	display: flex;
 	align-items: center;
@@ -1573,6 +1579,13 @@ textarea:focus {
 .public-event-date {
 	color: var(--muted);
 	text-transform: capitalize;
+}
+
+.public-event-description {
+	margin: 18px 0 0;
+	color: #46584d;
+	line-height: 1.65;
+	white-space: pre-wrap;
 }
 
 .public-event-details {
