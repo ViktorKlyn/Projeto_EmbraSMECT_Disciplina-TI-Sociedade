@@ -1,0 +1,8 @@
+{
+  "builds": [
+    { "src": "frontend-convidado/package.json", "use": "@vercel/node" }
+  ],
+  "env": {
+    "NODE_VERSION": "24"
+  }
+}
