@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import EventShare from '../components/EventShare';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
-import { guestEventUrl } from '../services/guestApp';
+import { guestEventUrl, guestPortalUrl } from '../services/guestApp';
 
 const formatarData = (data) => new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', {
   weekday: 'long',
@@ -38,14 +38,39 @@ export default function PublicEvent() {
   const [inscrito, setInscrito] = useState(false);
   const [erro, setErro] = useState('');
   const [erroGestor, setErroGestor] = useState('');
+  const [eventoNaoPublico, setEventoNaoPublico] = useState(false);
+  const [identificadorReservado, setIdentificadorReservado] = useState(codigo);
+  const [buscandoReservado, setBuscandoReservado] = useState(false);
+  const [erroBuscaReservado, setErroBuscaReservado] = useState('');
+  const eventoReservadoAberto = useRef('');
 
   useEffect(() => {
+    if (eventoReservadoAberto.current === codigo) {
+      eventoReservadoAberto.current = '';
+      return undefined;
+    }
+
+    if (authLoading) return undefined;
+
     let ativo = true;
-    api.get(`/eventos/${encodeURIComponent(codigo)}`)
+    setEvento(null);
+    setEventoNaoPublico(false);
+    setIdentificadorReservado(codigo);
+    setErroBuscaReservado('');
+    setErro('');
+    setCarregando(true);
+    const requisicaoEvento = isManager
+      ? api.get(`/reservas/evento-gestao/${encodeURIComponent(codigo)}`)
+      : api.get(`/eventos/${encodeURIComponent(codigo)}`);
+    requisicaoEvento
       .then(({ data }) => {
         if (ativo) setEvento(data);
       })
       .catch((requestError) => {
+        if (ativo && requestError.response?.status === 404) {
+          setEventoNaoPublico(true);
+          return;
+        }
         if (ativo) setErro(requestError.response?.data?.erro || 'Não foi possível carregar os detalhes do evento.');
       })
       .finally(() => {
@@ -54,7 +79,33 @@ export default function PublicEvent() {
     return () => {
       ativo = false;
     };
-  }, [codigo]);
+  }, [authLoading, codigo, isManager]);
+
+  async function buscarEventoReservado(event) {
+    event.preventDefault();
+    const identificador = identificadorReservado.trim();
+    if (!identificador) return;
+
+    setErroBuscaReservado('');
+    if (!isManager) {
+      window.location.assign(`${guestPortalUrl()}/login?evento=${encodeURIComponent(identificador)}`);
+      return;
+    }
+
+    setBuscandoReservado(true);
+    try {
+      const { data } = await api.get(`/reservas/reservado-gestao/${encodeURIComponent(identificador)}`);
+      setEvento(data);
+      setEventoNaoPublico(true);
+      setInscrito(false);
+      eventoReservadoAberto.current = data.codigo;
+      navigate(`/evento/${encodeURIComponent(data.codigo)}`, { replace: true });
+    } catch (requestError) {
+      setErroBuscaReservado(requestError.response?.data?.erro || 'Não foi possível localizar o evento reservado.');
+    } finally {
+      setBuscandoReservado(false);
+    }
+  }
 
   useEffect(() => {
     if (authLoading || !isManager || !evento) return undefined;
@@ -131,6 +182,16 @@ export default function PublicEvent() {
     </header>
     {carregando && <p className="empty">Carregando detalhes do evento...</p>}
     {!carregando && erro && !evento && <div className="error" role="alert">{erro}</div>}
+    {!carregando && eventoNaoPublico && !evento && <section className="public-registration-card">
+      <span className="eyebrow">EVENTO RESERVADO</span>
+      <h1>Localizar evento reservado</h1>
+      <p>Este evento não está disponível publicamente. Informe o ID ou código do evento reservado para continuar.</p>
+      <form className="event-lookup-form" onSubmit={buscarEventoReservado}>
+        <label>ID ou código do evento<input value={identificadorReservado} onChange={(event) => setIdentificadorReservado(event.target.value)} maxLength="40" placeholder="Ex.: EVT-000001" required /></label>
+        <button className="primary-button" type="submit" disabled={buscandoReservado || !identificadorReservado.trim()}>{buscandoReservado ? 'Buscando...' : isManager ? 'Buscar evento' : 'Entrar e buscar'}</button>
+      </form>
+      {erroBuscaReservado && <p className="error" role="alert">{erroBuscaReservado}</p>}
+    </section>}
     {!carregando && evento && <>
       <section className="public-event-card">
         <div className="public-event-title">
@@ -142,10 +203,11 @@ export default function PublicEvent() {
         <div className="public-event-details">
           <div><span>Horário</span><strong>{evento.horaInicio} – {evento.horaFim} · {evento.duracaoMinutos} min</strong></div>
           <div><span>Espaço</span><strong>{evento.sala}</strong></div>
+          {isManager && <div><span>Recursos técnicos</span><strong>{evento.recurso || 'Nenhum recurso selecionado'}</strong></div>}
           <div><span>Palestrante</span><strong>{evento.palestrante}</strong></div>
           <div><span>Vagas</span><strong>{evento.participantes} / {evento.capacidadeSala} inscritos</strong></div>
         </div>
-        <EventShare codigo={evento.codigo} mostrarLinkInscricao={false} />
+        <EventShare codigo={evento.codigo} />
       </section>
 
       <section className="public-registration-card">

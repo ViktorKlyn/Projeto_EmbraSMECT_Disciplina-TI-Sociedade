@@ -14,6 +14,7 @@ import RoomResources from './pages/RoomResources';
 import GuestSignup from './pages/GuestSignup';
 import GuestEventAccess from './pages/GuestEventAccess';
 import PublicEvent from './pages/PublicEvent';
+import TechnicalResources from './pages/TechnicalResources';
 
 // Redireciona visitantes não autenticados para a tela de login.
 function PrivateRoutes() {
@@ -50,6 +51,7 @@ export default function App() {
         <Route element={<RoleRoute roles={['admin', 'organizer']} />}>
           <Route path="/reservas" element={<Reservas />} />
           <Route path="/relatorios" element={<Relatorios />} />
+          <Route path="/recursos-tecnicos" element={<TechnicalResources />} />
         </Route>
         <Route element={<RoleRoute roles={['guest']} />}>
           <Route path="/meu-evento" element={<GuestEvent />} />

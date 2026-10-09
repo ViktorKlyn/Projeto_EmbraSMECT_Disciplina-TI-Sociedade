@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import reservaRoutes from './routes/reserva.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import usuariosRoutes from './routes/usuarios.routes.js';
+import recursosTecnicosRoutes from './routes/recursos-tecnicos.routes.js';
 import publicEventRoutes from './routes/public-event.routes.js';
 import { logger } from './middlewares/logger.js';
 import { exigirAutenticacao } from './middlewares/auth.js';
@@ -64,6 +65,7 @@ app.get('/api/status', (req, res) => {
 app.use('/api/login', authRoutes);
 app.use('/api/eventos', publicEventRoutes);
 app.use('/api/reservas', exigirAutenticacao, reservaRoutes);
+app.use('/api/recursos-tecnicos', exigirAutenticacao, recursosTecnicosRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 
 // PORT vem do ambiente, como o valor fornecido pelo Railway.

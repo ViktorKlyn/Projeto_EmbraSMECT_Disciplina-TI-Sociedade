@@ -17,6 +17,7 @@ import {
   removerUsuario,
 } from '../repositories/usuario.repository.js';
 import { renomearEspaco, salaEmUso } from '../repositories/reserva.repository.js';
+import { desvincularRecursosTecnicosDaSala } from '../repositories/recurso-tecnico.repository.js';
 
 const router = Router();
 const emailValido = /^\S+@\S+\.\S+$/;
@@ -27,7 +28,7 @@ function usuarioPublico({ senha, ...usuario }) {
 }
 
 function apenasAdmin(req, res, next) {
-  if (req.usuario.role !== 'admin') return res.status(403).json({ erro: 'Somente ADM pode gerenciar contas.' });
+  if (req.usuario.role !== 'admin') return res.status(403).json({ erro: 'Somente ADM ou Gestores podem gerenciar contas.' });
   return next();
 }
 
@@ -72,7 +73,7 @@ router.post('/organizadores', async (req, res) => {
 });
 
 router.post('/salas', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode criar espaços.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode criar espaços.' });
 
   const nome = typeof req.body.nome === 'string' ? req.body.nome.trim() : '';
   const capacidade = Number(req.body.capacidade);
@@ -88,7 +89,7 @@ router.post('/salas', (req, res) => {
 });
 
 router.delete('/salas/:id', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode excluir espaços.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode excluir espaços.' });
 
   const sala = listarSalas().find((item) => item.id === Number(req.params.id));
   if (!sala) return res.status(404).json({ erro: 'Espaço não encontrado.' });
@@ -96,12 +97,13 @@ router.delete('/salas/:id', (req, res) => {
 
   const removida = removerSala(sala.id);
   if (!removida) return res.status(404).json({ erro: 'Não foi possível remover o espaço.' });
+  desvincularRecursosTecnicosDaSala(sala.id);
 
   return res.json({ sala: removida });
 });
 
 router.patch('/salas/:id/nome', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode alterar espaços.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode alterar espaços.' });
 
   const resultado = renomearEspaco(req.params.id, req.body.nome);
   if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
@@ -109,7 +111,7 @@ router.patch('/salas/:id/nome', (req, res) => {
 });
 
 router.patch('/salas/:id', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode alterar espaços.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode alterar espaços.' });
 
   const capacidade = req.body.capacidade;
   if (!Number.isInteger(Number(capacidade)) || Number(capacidade) < 1 || Number(capacidade) > 500) {
@@ -123,7 +125,7 @@ router.patch('/salas/:id', (req, res) => {
 });
 
 router.patch('/salas/:id/conjugada', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode configurar espaços para uso conjunto.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode configurar espaços para uso conjunto.' });
 
   const conjugadaId = req.body.conjugadaId === null ? null : Number(req.body.conjugadaId);
   if (conjugadaId !== null && (!Number.isInteger(conjugadaId) || conjugadaId < 1)) {
@@ -139,17 +141,17 @@ router.patch('/salas/:id/conjugada', (req, res) => {
 router.patch('/:id/promover-admin', (req, res) => {
   const usuario = buscarUsuarioPorId(req.params.id);
   if (!usuario) return res.status(404).json({ erro: 'Conta não encontrada.' });
-  if (usuario.role !== 'organizer') return res.status(409).json({ erro: 'Somente organizadores podem ser promovidos a ADM.' });
+  if (usuario.role !== 'organizer') return res.status(409).json({ erro: 'Somente organizadores podem ser promovidos a Gestor.' });
 
   return res.json({ usuario: usuarioPublico(promoverOrganizador(usuario.id)) });
 });
 
 router.patch('/:id/rebaixar-admin', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode rebaixar contas.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode rebaixar contas.' });
 
   const usuario = buscarUsuarioPorId(req.params.id);
   if (!usuario) return res.status(404).json({ erro: 'Conta não encontrada.' });
-  if (usuario.role !== 'admin' || usuario.principal) return res.status(409).json({ erro: 'Somente ADM comum pode ser rebaixado para organizador.' });
+  if (usuario.role !== 'admin' || usuario.principal) return res.status(409).json({ erro: 'Somente contas de Gestor podem ser rebaixadas para organizador.' });
 
   const atualizado = rebaixarAdmin(usuario.id);
   if (!atualizado) return res.status(409).json({ erro: 'Não foi possível rebaixar esta conta.' });
@@ -158,12 +160,12 @@ router.patch('/:id/rebaixar-admin', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM principal pode excluir contas.' });
+  if (!eAdminPrincipal(req.usuario.id)) return res.status(403).json({ erro: 'Somente o ADM pode excluir contas.' });
 
   const usuario = buscarUsuarioPorId(req.params.id);
   if (!usuario) return res.status(404).json({ erro: 'Conta não encontrada.' });
-  if (usuario.id === req.usuario.id) return res.status(403).json({ erro: 'O ADM principal não pode excluir a própria conta.' });
-  if (usuario.principal) return res.status(409).json({ erro: 'O ADM principal não pode ser excluído.' });
+  if (usuario.id === req.usuario.id) return res.status(403).json({ erro: 'O ADM não pode excluir a própria conta.' });
+  if (usuario.principal) return res.status(409).json({ erro: 'O ADM não pode ser excluído.' });
 
   const removido = removerUsuario(usuario.id);
   if (!removido) return res.status(404).json({ erro: 'Não foi possível excluir a conta.' });

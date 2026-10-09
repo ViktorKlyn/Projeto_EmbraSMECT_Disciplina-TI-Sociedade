@@ -2,11 +2,10 @@ import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { guestEventUrl } from '../services/guestApp';
 
-export default function EventShare({ codigo, mostrarLinkInscricao = true }) {
+export default function EventShare({ codigo, reservado = false }) {
   const [qrCode, setQrCode] = useState('');
   const [erro, setErro] = useState('');
   const url = guestEventUrl(codigo, 'acesso');
-  const inscricaoUrl = guestEventUrl(codigo);
 
   useEffect(() => {
     let ativo = true;
@@ -23,12 +22,21 @@ export default function EventShare({ codigo, mostrarLinkInscricao = true }) {
     };
   }, [url]);
 
+  if (reservado) {
+    return <div className="event-share">
+      <div>
+        <span className="eyebrow">EVENTO RESERVADO</span>
+        <p>Código para compartilhar com os convidados autorizados: <strong>{codigo}</strong></p>
+        <small>O convidado deve entrar no portal e informar este código para localizar o evento.</small>
+      </div>
+    </div>;
+  }
+
   return <div className="event-share">
     <div>
       <span className="eyebrow">PÁGINA DO CONVIDADO</span>
       <p><a href={url} target="_blank" rel="noreferrer">Abrir acesso do convidado</a></p>
       <small>Compartilhe o link ou o QR code para o convidado entrar e ver a programação após a inscrição.</small>
-      {mostrarLinkInscricao && <p><a href={inscricaoUrl} target="_blank" rel="noreferrer">Abrir página pública de inscrição</a></p>}
       {erro && <small className="error" role="alert">{erro}</small>}
     </div>
     {qrCode && <img src={qrCode} alt={`QR code do acesso do convidado ao evento ${codigo}`} width="110" height="110" />}

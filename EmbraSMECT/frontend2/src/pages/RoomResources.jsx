@@ -145,7 +145,7 @@ export default function RoomResources() {
 
   return <section>
     <div className="page-heading">
-      <span className="eyebrow">ADMINISTRAÇÃO PRINCIPAL</span>
+      <span className="eyebrow">ÁREA EXCLUSIVA DO ADM</span>
       <h1>Espaços</h1>
       <p>Cadastre espaços, ajuste a capacidade, configure espaços que podem ser unidos e remova ambientes sem reservas vinculadas.</p>
     </div>

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
 const formularioInicial = { nome: '', email: '', senha: '' };
-const nomesPapeis = { admin: 'ADM', organizer: 'Organizador', guest: 'Convidado' };
+const nomesPapeis = { admin: 'Gestor', organizer: 'Organizador', guest: 'Convidado' };
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -48,14 +48,14 @@ export default function AdminUsers() {
   }
 
   async function promoverParaAdmin(usuario) {
-    if (!window.confirm(`Promover ${usuario.nome} a ADM? A alteração dá acesso administrativo completo.`)) return;
+    if (!window.confirm(`Promover ${usuario.nome} a Gestor? A alteração concede permissões de gestão.`)) return;
     setErro('');
     setMensagem('');
     setPromovendoId(usuario.id);
     try {
       const { data } = await api.patch(`/usuarios/${usuario.id}/promover-admin`);
       setUsuarios((lista) => lista.map((item) => item.id === usuario.id ? data.usuario : item));
-      setMensagem(`${usuario.nome} agora é ADM. A nova permissão vale após entrar novamente.`);
+      setMensagem(`${usuario.nome} agora é Gestor. A nova permissão vale após entrar novamente.`);
     } catch (requestError) {
       setErro(requestError.response?.data?.erro || 'Não foi possível promover esta conta.');
     } finally {
@@ -64,7 +64,7 @@ export default function AdminUsers() {
   }
 
   async function rebaixarParaOrganizador(usuario) {
-    if (!window.confirm(`Rebaixar ${usuario.nome} de ADM para Organizador?`)) return;
+    if (!window.confirm(`Rebaixar ${usuario.nome} de Gestor para Organizador?`)) return;
     setErro('');
     setMensagem('');
     setRebaixandoId(usuario.id);
@@ -99,7 +99,7 @@ export default function AdminUsers() {
     <div className="page-heading">
       <span className="eyebrow">CONTROLE DE ACESSO</span>
       <h1>Contas e permissões</h1>
-      <p>Crie acessos para gestores e conceda privilégios ADM somente a organizadores autorizados.</p>
+      <p>Crie acessos de organizador e promova organizadores autorizados a Gestor.</p>
     </div>
     {mensagem && <p className="notice" role="status">{mensagem}</p>}
     {erro && <p className="error" role="alert">{erro}</p>}
@@ -117,7 +117,7 @@ export default function AdminUsers() {
 
       <div className="account-panel">
         <div className="account-panel-heading">
-          <div><h2>Contas cadastradas</h2><p>{eADMPrincipal ? 'O principal pode rebaixar ou excluir ADM e organizadores.' : 'Acesso administrativo limitado ao perfil principal.'}</p></div>
+          <div><h2>Contas cadastradas</h2><p>{eADMPrincipal ? 'O ADM pode rebaixar ou excluir Gestores e organizadores.' : 'Você pode gerenciar contas e promover organizadores a Gestor.'}</p></div>
           <span>{usuarios.length}</span>
         </div>
         {carregando && <p className="empty">Carregando contas...</p>}
@@ -126,12 +126,12 @@ export default function AdminUsers() {
           {usuarios.map((usuario) => <article className="account-row" key={usuario.id}>
             <div className="account-identity">
               <strong>{usuario.nome}</strong>
-              <small>{usuario.email || (usuario.role === 'guest' ? 'E-mail restrito ao ADM principal' : '')}</small>
-              {usuario.principal && <span className="admiral-badge">ADM principal</span>}
+              <small>{usuario.email || (usuario.role === 'guest' ? 'E-mail restrito ao ADM' : '')}</small>
+              {usuario.principal && <span className="admiral-badge">ADM</span>}
             </div>
-            <span className={`account-role ${usuario.role}`}>{usuario.principal ? 'Principal' : nomesPapeis[usuario.role]}</span>
+            {!usuario.principal && <span className={`account-role ${usuario.role}`}>{nomesPapeis[usuario.role]}</span>}
             <div className="account-actions">
-              {usuario.role === 'organizer' && !usuario.principal && <button className="link-button account-promote" type="button" disabled={promovendoId === usuario.id} onClick={() => promoverParaAdmin(usuario)}>{promovendoId === usuario.id ? 'Promovendo...' : 'Promover a ADM'}</button>}
+              {usuario.role === 'organizer' && !usuario.principal && <button className="link-button account-promote" type="button" disabled={promovendoId === usuario.id} onClick={() => promoverParaAdmin(usuario)}>{promovendoId === usuario.id ? 'Promovendo...' : 'Promover a Gestor'}</button>}
               {usuario.role === 'admin' && !usuario.principal && eADMPrincipal && <button className="link-button account-relegate" type="button" disabled={rebaixandoId === usuario.id} onClick={() => rebaixarParaOrganizador(usuario)}>{rebaixandoId === usuario.id ? 'Rebaixando...' : 'Rebaixar'}</button>}
               {usuario.role === 'admin' && !usuario.principal && eADMPrincipal && <button className="link-button account-delete" type="button" disabled={removendoId === usuario.id} onClick={() => excluirUsuario(usuario)}>{removendoId === usuario.id ? 'Excluindo...' : 'Excluir'}</button>}
               {usuario.role === 'organizer' && !usuario.principal && eADMPrincipal && <button className="link-button account-delete" type="button" disabled={removendoId === usuario.id} onClick={() => excluirUsuario(usuario)}>{removendoId === usuario.id ? 'Excluindo...' : 'Excluir'}</button>}

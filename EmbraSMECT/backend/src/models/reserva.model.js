@@ -16,7 +16,7 @@ export function criarReserva(dados, id) {
     recurso: dados.recurso,
     status: dados.status || 'pendente',
     motivoRejeicao: null,
-    gerenciarAssentos: Boolean(dados.gerenciarAssentos),
+    reservado: dados.reservado === true,
     palestrante: dados.palestrante || 'A definir',
     duracaoMinutos: Number(dados.duracaoMinutos) || 60,
     brinde: dados.brinde?.trim() || 'Não haverá brinde',

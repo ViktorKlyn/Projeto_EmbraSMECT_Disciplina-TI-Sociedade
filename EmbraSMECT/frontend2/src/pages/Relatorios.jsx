@@ -7,7 +7,7 @@ export default function Relatorios() {
   const [reservas, setReservas] = useState([]);
   useEffect(() => { api.get('/reservas/relatorios').then(({ data }) => setReservas(data)); }, []);
   return <section>
-    <div className="page-heading"><span className="eyebrow">ACOMPANHAMENTO</span><h1>Relatórios</h1><p>Consulte eventos, participantes e ocupação. Em <strong>Abrir evento</strong>, ADM e organizadores podem se inscrever nos eventos disponíveis.</p></div>
+    <div className="page-heading"><span className="eyebrow">ACOMPANHAMENTO</span><h1>Relatórios</h1><p>Consulte eventos, participantes e ocupação. Abra a página do evento para acessar seus detalhes e o link do convidado.</p></div>
     <div className="table-wrap"><table><thead><tr><th>Evento</th><th>Organizador</th><th>Espaço</th><th>Data</th><th>Horário</th><th>Participantes</th><th>Ocupação</th><th>Status</th><th>Página</th></tr></thead><tbody>
       {reservas.map((reserva) => <tr key={reserva.id}>
         <td>{reserva.nome}</td>

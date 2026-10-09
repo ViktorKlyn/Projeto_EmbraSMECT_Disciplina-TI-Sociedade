@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
   // Envia as credenciais ao fluxo correspondente e guarda a sessão localmente.
   async function autenticar(email, senha, endpoint) {
     const { data } = await api.post(endpoint, { email, senha });
-    // Guarda também o papel e a marcação de administrador principal para controlar a interface.
+    // Guarda também o papel e a marcação do ADM para controlar a interface.
     setUser({ id: data.usuario.id, nome: data.usuario.nome, email: data.usuario.email, role: data.usuario.role, principal: Boolean(data.usuario.principal) });
     sessionStorage.setItem('embrasmect_token', data.token);
     setAuthError('');

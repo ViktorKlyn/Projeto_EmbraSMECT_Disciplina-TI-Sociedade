@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 
 const formatarData = (data) => new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', {
@@ -22,12 +22,15 @@ function dataAtualISO() {
 
 export default function PublicEvent() {
   const { codigo } = useParams();
+  const navigate = useNavigate();
   const [evento, setEvento] = useState(null);
   const [formulario, setFormulario] = useState({ nome: '', email: '' });
+  const [identificadorReservado, setIdentificadorReservado] = useState(codigo);
   const [carregando, setCarregando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [inscrito, setInscrito] = useState(false);
   const [erro, setErro] = useState('');
+  const [eventoNaoPublico, setEventoNaoPublico] = useState(false);
 
   useEffect(() => {
     let ativo = true;
@@ -36,6 +39,11 @@ export default function PublicEvent() {
         if (ativo) setEvento(data);
       })
       .catch((requestError) => {
+        if (ativo && requestError.response?.status === 404) {
+          setEventoNaoPublico(true);
+          setIdentificadorReservado(codigo);
+          return;
+        }
         if (ativo) setErro(requestError.response?.data?.erro || 'Não foi possível carregar os detalhes do evento.');
       })
       .finally(() => {
@@ -45,6 +53,13 @@ export default function PublicEvent() {
       ativo = false;
     };
   }, [codigo]);
+
+  function buscarEventoReservado(event) {
+    event.preventDefault();
+    const identificador = identificadorReservado.trim();
+    if (!identificador) return;
+    navigate(`/login?evento=${encodeURIComponent(identificador)}`);
+  }
 
   async function inscrever(event) {
     event.preventDefault();
@@ -73,6 +88,15 @@ export default function PublicEvent() {
     </header>
     {carregando && <p className="empty">Carregando detalhes do evento...</p>}
     {!carregando && erro && !evento && <div className="error" role="alert">{erro}</div>}
+    {!carregando && eventoNaoPublico && !evento && <section className="panel">
+      <span className="eyebrow">EVENTO RESERVADO</span>
+      <h1>Localizar evento reservado</h1>
+      <p>Este evento não está disponível publicamente. Se você recebeu o ID ou código de um evento reservado, informe abaixo para entrar e localizá-lo.</p>
+      <form className="event-lookup-form" onSubmit={buscarEventoReservado}>
+        <label>ID ou código do evento<input value={identificadorReservado} onChange={(event) => setIdentificadorReservado(event.target.value)} maxLength="40" placeholder="Ex.: EVT-000001" required /></label>
+        <button className="primary-button" type="submit" disabled={!identificadorReservado.trim()}>Entrar e buscar</button>
+      </form>
+    </section>}
     {!carregando && evento && <>
       <section className="panel">
         <div className="event-title">

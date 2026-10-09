@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import {
 	getEventosDisponiveis,
+	getEventosDoMes,
+	getProximoMesComEventos,
+	getEventoReservado,
+	getEventoReservadoGestao,
+	getEventoRelatorioGestao,
 	getEventosTV,
+	getDisponibilidadeRecursos,
 	getRelatorios,
 	getReservas,
 	getEventosInscritos,
 	getEventoInscrito,
 	deleteEvento,
-	patchAssento,
 	patchEvento,
 	patchReserva,
 	postInscricao,
@@ -26,13 +31,38 @@ router.get('/salas', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') {
 		return res.json(listarSalas());
 	}
-	return res.status(403).json({ erro: 'Somente ADM ou organizadores podem consultar os espaços.' });
+	return res.status(403).json({ erro: 'Somente ADM, Gestores ou organizadores podem consultar os espaços.' });
 });
 
 router.get('/ficha', (req, res, next) => {
 	if (['guest', 'admin', 'organizer'].includes(req.usuario.role)) return next();
 	return res.status(403).json({ erro: 'Papel de usuário sem permissão para consultar eventos disponíveis.' });
 }, getEventosDisponiveis);
+
+router.get('/mes', (req, res, next) => {
+	if (req.usuario.role === 'guest') return next();
+	return res.status(403).json({ erro: 'Somente convidados podem consultar os eventos do mês.' });
+}, getEventosDoMes);
+
+router.get('/proximo-mes', (req, res, next) => {
+	if (req.usuario.role === 'guest') return next();
+	return res.status(403).json({ erro: 'Somente convidados podem consultar os eventos públicos.' });
+}, getProximoMesComEventos);
+
+router.get('/reservado/:identificador', (req, res, next) => {
+	if (req.usuario.role === 'guest') return next();
+	return res.status(403).json({ erro: 'Somente convidados podem consultar eventos reservados.' });
+}, getEventoReservado);
+
+router.get('/reservado-gestao/:identificador', (req, res, next) => {
+	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
+	return res.status(403).json({ erro: 'Somente ADM, Gestores ou organizadores podem consultar eventos reservados.' });
+}, getEventoReservadoGestao);
+
+router.get('/evento-gestao/:identificador', (req, res, next) => {
+	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
+	return res.status(403).json({ erro: 'Somente ADM, Gestores ou organizadores podem consultar os detalhes de gestão do evento.' });
+}, getEventoRelatorioGestao);
 
 router.get('/inscricoes', (req, res, next) => {
 	if (['guest', 'admin', 'organizer'].includes(req.usuario.role)) return next();
@@ -41,13 +71,18 @@ router.get('/inscricoes', (req, res, next) => {
 
 router.get('/relatorios', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
-	return res.status(403).json({ erro: 'Somente ADM ou organizadores podem consultar relatórios.' });
+	return res.status(403).json({ erro: 'Somente ADM, Gestores ou organizadores podem consultar relatórios.' });
 }, getRelatorios);
 
 router.get('/tv', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
-	return res.status(403).json({ erro: 'Somente ADM ou organizadores podem exibir a programação na TV.' });
+	return res.status(403).json({ erro: 'Somente ADM, Gestores ou organizadores podem exibir a programação na TV.' });
 }, getEventosTV);
+
+router.get('/disponibilidade-recursos', (req, res, next) => {
+	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
+	return res.status(403).json({ erro: 'Somente ADM, Gestores ou organizadores podem consultar a disponibilidade dos recursos.' });
+}, getDisponibilidadeRecursos);
 
 router.patch('/:id', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
@@ -64,11 +99,6 @@ router.post('/:id/inscricoes', (req, res, next) => {
 	return res.status(403).json({ erro: 'Papel de usuário sem permissão para se inscrever.' });
 }, postInscricao);
 
-router.patch('/:id/inscricoes/:convidadoId/assento', (req, res, next) => {
-	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') return next();
-	return res.status(403).json({ erro: 'Somente ADM ou o organizador podem atribuir assentos.' });
-}, patchAssento);
-
 // Todos os papéis cadastrados podem consultar reservas; outros são recusados.
 router.get('/', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer' || req.usuario.role === 'guest') {
@@ -78,7 +108,7 @@ router.get('/', (req, res, next) => {
 	}
 }, getReservas);
 
-// Administradores e organizadores podem solicitar reservas; convidados não podem.
+// ADM, Gestores e organizadores podem solicitar reservas; convidados não podem.
 router.post('/', (req, res, next) => {
 	if (req.usuario.role === 'admin' || req.usuario.role === 'organizer') {
 		return next();
@@ -89,9 +119,9 @@ router.post('/', (req, res, next) => {
 	}
 }, postReserva);
 
-// Somente administradores podem tomar decisões sobre reservas.
+// Somente ADM e Gestores podem tomar decisões sobre reservas.
 router.patch('/:id/decisao', (req, res, next) => {
 	if (req.usuario.role === 'admin') return next();
-	return res.status(403).json({ erro: 'Somente administradores podem aprovar ou rejeitar reservas.' });
+	return res.status(403).json({ erro: 'Somente ADM ou Gestores podem aprovar ou rejeitar reservas.' });
 }, patchReserva);
 export default router;

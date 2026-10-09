@@ -32,7 +32,6 @@ export function inscreverConvidadoPublico(reservaId, convidado) {
     convidadoId: convidado.convidadoId || null,
     nome: convidado.nome.trim(),
     email: emailNormalizado,
-    assento: null,
   });
   salvarColecoes({ inscricoes });
   return { evento: incluirOcupacao(reserva) };
@@ -62,7 +61,6 @@ function incluirOcupacao(reserva, incluirConvidados = false, incluirEmailConvida
         id: inscricao.id ?? inscricao.convidadoId,
         nome: inscricao.nome || convidado?.nome || 'Convidado',
         ...(incluirEmailConvidados ? { email: inscricao.email || convidado?.email || '' } : {}),
-        assento: inscricao.assento,
       };
     }) } : {}),
   };
@@ -70,17 +68,17 @@ function incluirOcupacao(reserva, incluirConvidados = false, incluirEmailConvida
 
 export function listarReservas(usuario) {
   const visiveis = reservas.filter((reserva) => {
-    if (usuario.role === 'admin') return true;
-    if (usuario.role === 'organizer') return reserva.usuarioId === Number(usuario.id);
+    if (usuario.role === 'admin' || usuario.role === 'organizer') {
+      if (eAdmPrincipal(usuario)) return true;
+      return reserva.usuarioId === Number(usuario.id);
+    }
     if (usuario.role === 'guest') return reserva.status === 'aprovada' && inscricoes.some((inscricao) => inscricao.reservaId === reserva.id && inscricao.convidadoId === Number(usuario.id));
     return false;
   });
 
   return visiveis.map((reserva) => {
     if (usuario.role === 'guest') {
-      const inscricao = inscricoes.find((item) => item.reservaId === reserva.id && item.convidadoId === Number(usuario.id));
-      const assento = inscricao.assento || (reserva.gerenciarAssentos ? 'Aguardando atribuição' : 'Sem assento marcado');
-      return { ...incluirOcupacao(reserva), assento };
+      return incluirOcupacao(reserva);
     }
     return incluirOcupacao(reserva, true, eAdmPrincipal(usuario));
   });
@@ -103,6 +101,85 @@ export function listarEventosInscritos(usuario) {
       palestrante: reserva.palestrante,
       duracaoMinutos: reserva.duracaoMinutos,
     }));
+}
+
+export function listarEventosDoMes(usuario, mes) {
+  const prefixoMes = `${mes}-`;
+  return reservas
+    .filter((reserva) => reserva.status === 'aprovada' && !reserva.reservado && reserva.data.startsWith(prefixoMes))
+    .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio.localeCompare(b.horaInicio))
+    .map((reserva) => {
+      const inscrito = inscricoes.some((item) => item.reservaId === reserva.id && (
+        item.convidadoId
+          ? item.convidadoId === Number(usuario.id)
+          : item.email?.toLocaleLowerCase('pt-BR') === usuario.email?.toLocaleLowerCase('pt-BR')
+      ));
+      const evento = incluirOcupacao(reserva);
+      return {
+        id: evento.id,
+        codigo: evento.codigo,
+        nome: evento.nome,
+        descricao: evento.descricao || '',
+        data: evento.data,
+        horaInicio: evento.horaInicio,
+        horaFim: evento.horaFim,
+        sala: evento.sala,
+        palestrante: evento.palestrante,
+        duracaoMinutos: evento.duracaoMinutos,
+        capacidadeSala: evento.capacidadeSala,
+        participantes: evento.participantes,
+        inscrito,
+      };
+    });
+}
+
+export function buscarProximoMesComEventos(usuario) {
+  const partesHoje = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const valoresHoje = Object.fromEntries(partesHoje.map(({ type, value }) => [type, value]));
+  const hoje = `${valoresHoje.year}-${valoresHoje.month}-${valoresHoje.day}`;
+  const proximoEvento = reservas
+    .filter((reserva) => reserva.status === 'aprovada' && !reserva.reservado && reserva.data >= hoje)
+    .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio.localeCompare(b.horaInicio))[0];
+
+  if (!proximoEvento) return null;
+  const mes = proximoEvento.data.slice(0, 7);
+  return { mes, eventos: listarEventosDoMes(usuario, mes) };
+}
+
+export function buscarEventoReservado(identificador, usuario) {
+  const termo = identificador.trim().toLocaleLowerCase('pt-BR');
+  const reserva = reservas.find((item) => (
+    item.codigo.toLocaleLowerCase('pt-BR') === termo
+    || (String(item.id) === termo && /^\d+$/.test(termo))
+  ));
+  if (!reserva?.reservado) return null;
+
+  const evento = incluirOcupacao(reserva);
+  const inscrito = inscricoes.some((item) => item.reservaId === reserva.id && (
+    item.convidadoId
+      ? item.convidadoId === Number(usuario.id)
+      : item.email?.toLocaleLowerCase('pt-BR') === usuario.email?.toLocaleLowerCase('pt-BR')
+  ));
+  return {
+    id: evento.id,
+    codigo: evento.codigo,
+    nome: evento.nome,
+    descricao: evento.descricao || '',
+    data: evento.data,
+    horaInicio: evento.horaInicio,
+    horaFim: evento.horaFim,
+    sala: evento.sala,
+    palestrante: evento.palestrante,
+    duracaoMinutos: evento.duracaoMinutos,
+    capacidadeSala: evento.capacidadeSala,
+    participantes: evento.participantes,
+    inscrito,
+  };
 }
 
 export function listarReservasRelatorio(usuario) {
@@ -148,7 +225,6 @@ export function buscarEventoInscritoPorCodigo(codigo, usuario) {
   if (!inscricao) return null;
 
   const evento = incluirOcupacao(reserva);
-  const assento = inscricao.assento || (reserva.gerenciarAssentos ? 'Aguardando atribuição' : 'Sem assento marcado');
   return {
     codigo: evento.codigo,
     nome: evento.nome,
@@ -161,7 +237,6 @@ export function buscarEventoInscritoPorCodigo(codigo, usuario) {
     palestrante: evento.palestrante,
     duracaoMinutos: evento.duracaoMinutos,
     brinde: evento.brinde,
-    assento,
   };
 }
 
@@ -209,6 +284,32 @@ export function temConflitoDeHorario({ salas: salasSolicitadas, data, horaInicio
   });
 }
 
+export function buscarConflitoDeRecursoHorario({ recursos: recursosSolicitados, data, horaInicio, horaFim, ignorarId }) {
+  return listarConflitosDeRecursosHorario({ data, horaInicio, horaFim, ignorarId })
+    .find((conflito) => recursosSolicitados.some((recurso) => (
+      recurso.toLocaleLowerCase('pt-BR') === conflito.recurso.toLocaleLowerCase('pt-BR')
+    )))?.recurso || null;
+}
+
+export function listarConflitosDeRecursosHorario({ data, horaInicio, horaFim, ignorarId }) {
+  return reservas.flatMap((reserva) => {
+    if (reserva.id === Number(ignorarId) || reserva.status === 'rejeitada' || reserva.data !== data) return [];
+    if (!(horaInicio < reserva.horaFim && horaFim > reserva.horaInicio)) return [];
+    const recursosDoEvento = [...new Set((Array.isArray(reserva.recurso)
+      ? reserva.recurso
+      : typeof reserva.recurso === 'string' ? reserva.recurso.split(',') : [])
+      .map((recurso) => recurso.trim())
+      .filter(Boolean))];
+    return recursosDoEvento.map((recurso) => ({
+      recurso,
+      data: reserva.data,
+      horaInicio: reserva.horaInicio,
+      horaFim: reserva.horaFim,
+      sala: reserva.sala,
+    }));
+  });
+}
+
 export function salaEmUso(nomeSala) {
   return reservaUsaSala(nomeSala);
 }
@@ -218,6 +319,7 @@ export function buscarEventosDisponiveis(usuarioId, identificador) {
   const termo = identificador.trim().toLocaleLowerCase('pt-BR');
   return reservas
     .filter((reserva) => reserva.status === 'aprovada'
+      && !reserva.reservado
       && reserva.data >= hoje
       && !inscricoes.some((item) => item.reservaId === reserva.id && item.convidadoId === Number(usuarioId))
       && (reserva.codigo.toLocaleLowerCase('pt-BR') === termo || reserva.nome.toLocaleLowerCase('pt-BR').includes(termo)))
@@ -244,7 +346,7 @@ export function atualizarReserva(id, dados) {
     sala: dados.sala,
     salas: dados.salas,
     recurso: dados.recurso,
-    gerenciarAssentos: dados.gerenciarAssentos,
+    reservado: dados.reservado === true,
     palestrante: dados.palestrante,
     duracaoMinutos: dados.duracaoMinutos,
     brinde: dados.brinde,
@@ -269,35 +371,21 @@ export function inscreverConvidado(reservaId, convidadoId) {
   const reserva = reservas.find((item) => item.id === Number(reservaId));
   if (!reserva || reserva.status !== 'aprovada') return { erro: 'Este evento não está aberto para inscrição.', status: 404 };
   if (reserva.data < new Date().toISOString().slice(0, 10)) return { erro: 'As inscrições para este evento foram encerradas.', status: 409 };
-  if (inscricoes.some((item) => item.reservaId === reserva.id && item.convidadoId === Number(convidadoId))) return { erro: 'Você já está inscrito neste evento.', status: 409 };
+  const convidado = buscarUsuarioPorId(convidadoId);
+  const emailConvidado = convidado?.email?.toLocaleLowerCase('pt-BR');
+  if (inscricoes.some((item) => item.reservaId === reserva.id && (
+    item.convidadoId === Number(convidadoId)
+      || (!item.convidadoId && emailConvidado && item.email?.toLocaleLowerCase('pt-BR') === emailConvidado)
+  ))) return { erro: 'Você já está inscrito neste evento.', status: 409 };
 
   const capacidade = salasDaReserva(reserva)
     .reduce((total, nomeSala) => total + (buscarSalaPorNome(nomeSala)?.capacidade || 0), 0) || 1;
   if (inscricoesDaReserva(reserva.id).length >= capacidade) return { erro: 'As vagas deste evento já foram preenchidas.', status: 409 };
 
   const id = inscricoes.reduce((maiorId, item) => Math.max(maiorId, item.id || item.convidadoId || 0), 0) + 1;
-  inscricoes.push({ id, reservaId: reserva.id, convidadoId: Number(convidadoId), assento: null });
+  inscricoes.push({ id, reservaId: reserva.id, convidadoId: Number(convidadoId) });
   salvarColecoes({ inscricoes });
   return { evento: incluirOcupacao(reserva) };
-}
-
-export function atribuirAssento(reservaId, convidadoId, assento) {
-  const reserva = reservas.find((item) => item.id === Number(reservaId));
-  if (!reserva) return { erro: 'Evento não encontrado.', status: 404 };
-  if (!reserva.gerenciarAssentos) return { erro: 'A gestão de assentos está desativada neste evento.', status: 409 };
-
-  const inscricao = inscricoes.find((item) => item.reservaId === reserva.id
-    && (item.id ?? item.convidadoId) === Number(convidadoId));
-  if (!inscricao) return { erro: 'Convidado não inscrito neste evento.', status: 404 };
-  if (inscricoes.some((item) => item.reservaId === reserva.id
-    && (item.id ?? item.convidadoId) !== Number(convidadoId)
-    && item.assento?.toLowerCase() === assento.toLowerCase())) {
-    return { erro: 'Este assento já foi atribuído a outro convidado.', status: 409 };
-  }
-
-  inscricao.assento = assento;
-  salvarColecoes({ inscricoes });
-  return { inscrito: { id: inscricao.id ?? inscricao.convidadoId, assento: inscricao.assento } };
 }
 
 export function decidirReserva(id, decisao) {

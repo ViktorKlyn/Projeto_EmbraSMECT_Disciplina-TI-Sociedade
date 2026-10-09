@@ -8,7 +8,7 @@ export default function Layout() {
   const isAdmin = user?.role === 'admin';
   const isOrganizer = user?.role === 'organizer';
   const isGuest = user?.role === 'guest';
-  const roleName = isAdmin ? 'ADM' : isOrganizer ? 'Organizador de eventos' : 'Convidado';
+  const roleName = isAdmin ? (user?.principal === true ? 'ADM' : 'Gestor') : isOrganizer ? 'Organizador de eventos' : 'Convidado';
 
   useEffect(() => {
     document.title = isGuest ? 'Meu evento' : 'EmbraSMECT';
@@ -22,7 +22,8 @@ export default function Layout() {
       </header>
       <nav className="navigation">
         <NavLink to="/">Início</NavLink>
-        {(isAdmin || isOrganizer) && <NavLink to="/reservas">{isAdmin ? 'Reservas' : 'Minhas reservas'}</NavLink>}
+        {(isAdmin || isOrganizer) && <NavLink to="/reservas">Minhas reservas</NavLink>}
+        {(isAdmin || isOrganizer) && <NavLink to="/recursos-tecnicos">Recursos técnicos</NavLink>}
         {isAdmin && <NavLink to="/aprovacao">Aprovação</NavLink>}
         {(isAdmin || isOrganizer) && <NavLink to="/relatorios">Relatórios</NavLink>}
         {(isAdmin || isOrganizer) && <NavLink to="/tv">Exibição para TV</NavLink>}

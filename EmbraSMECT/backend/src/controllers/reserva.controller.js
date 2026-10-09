@@ -1,9 +1,14 @@
 import {
-  atribuirAssento,
   buscarRelatorios,
   buscarReservas,
+  buscarEventosDoMes,
+  buscarProximoMesComEventos,
+  buscarEventoReservado,
+  buscarEventoReservadoGestao,
+  buscarEventoRelatorioGestao,
   buscarEventosInscritos,
   buscarEventosTV,
+  buscarConflitosDeRecursosHorario,
   criarNovaReserva,
   decidirReserva,
   excluirReserva,
@@ -24,12 +29,57 @@ export function getEventosInscritos(req, res) {
   res.json(buscarEventosInscritos(req.usuario));
 }
 
+export function getEventosDoMes(req, res) {
+  try {
+    return res.json(buscarEventosDoMes(req.usuario, req.query.mes));
+  } catch (error) {
+    return res.status(400).json({ erro: error.message });
+  }
+}
+
+export function getProximoMesComEventos(req, res) {
+  return res.json(buscarProximoMesComEventos(req.usuario));
+}
+
+export function getEventoReservado(req, res) {
+  try {
+    const resultado = buscarEventoReservado(req.params.identificador, req.usuario);
+    if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
+    return res.json(resultado.evento);
+  } catch (error) {
+    return res.status(400).json({ erro: error.message });
+  }
+}
+
+export function getEventoReservadoGestao(req, res) {
+  const resultado = buscarEventoReservadoGestao(req.params.identificador, req.usuario);
+  if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
+  return res.json(resultado.evento);
+}
+
+export function getEventoRelatorioGestao(req, res) {
+  const resultado = buscarEventoRelatorioGestao(req.params.identificador, req.usuario);
+  if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
+  return res.json(resultado.evento);
+}
+
 export function getRelatorios(req, res) {
   res.json(buscarRelatorios(req.usuario));
 }
 
 export function getEventosTV(req, res) {
   res.json(buscarEventosTV(req.usuario));
+}
+
+export function getDisponibilidadeRecursos(req, res) {
+  const resultado = buscarConflitosDeRecursosHorario({
+    data: req.query.data,
+    horaInicio: req.query.horaInicio,
+    horaFim: req.query.horaFim,
+    ignorarId: req.query.ignorarId,
+  }, req.usuario);
+  if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
+  return res.json(resultado);
 }
 
 export function getEventoPublico(req, res) {
@@ -98,13 +148,4 @@ export function postInscricao(req, res) {
   const resultado = inscreverConvidado(req.params.id, req.usuario);
   if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
   return res.status(201).json(resultado.evento);
-}
-
-export function patchAssento(req, res) {
-  const assento = typeof req.body.assento === 'string' ? req.body.assento.trim() : '';
-  if (!assento || assento.length > 80) return res.status(400).json({ erro: 'Informe um assento válido de até 80 caracteres.' });
-
-  const resultado = atribuirAssento(req.params.id, req.params.convidadoId, assento, req.usuario);
-  if (resultado.erro) return res.status(resultado.status).json({ erro: resultado.erro });
-  return res.json(resultado.inscrito);
 }

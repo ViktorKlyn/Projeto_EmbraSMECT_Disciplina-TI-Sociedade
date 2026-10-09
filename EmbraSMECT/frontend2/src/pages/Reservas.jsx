@@ -12,7 +12,7 @@ const initialForm = {
   sala: '',
   unirSalas: false,
   recurso: [],
-  gerenciarAssentos: false,
+  reservado: false,
   palestrante: '',
   duracaoMinutos: 60,
   brinde: '',
@@ -48,15 +48,16 @@ export default function Reservas() {
   const { user } = useAuth();
   const [reservas, setReservas] = useState([]);
   const [salas, setSalas] = useState([]);
+  const [recursosTecnicos, setRecursosTecnicos] = useState([]);
   const [form, setForm] = useState(initialForm);
-  const [recursoAtual, setRecursoAtual] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [assentos, setAssentos] = useState({});
-  const [assentoSalvando, setAssentoSalvando] = useState('');
   const [edicao, setEdicao] = useState(null);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [excluindoReservaId, setExcluindoReservaId] = useState(null);
+  const [conflitosRecursos, setConflitosRecursos] = useState([]);
+  const [consultandoDisponibilidade, setConsultandoDisponibilidade] = useState(false);
+  const [erroDisponibilidade, setErroDisponibilidade] = useState('');
 
   async function carregar() {
     const { data } = await api.get('/reservas');
@@ -64,12 +65,13 @@ export default function Reservas() {
   }
 
   useEffect(() => {
-    Promise.all([carregar(), api.get('/reservas/salas')])
-      .then(([, { data }]) => {
-        setSalas(data);
-        setForm((atual) => ({ ...atual, sala: atual.sala || data[0]?.nome || '' }));
+    Promise.all([carregar(), api.get('/reservas/salas'), api.get('/recursos-tecnicos')])
+      .then(([, { data: listaSalas }, { data: listaRecursos }]) => {
+        setSalas(listaSalas);
+        setRecursosTecnicos(listaRecursos);
+        setForm((atual) => ({ ...atual, sala: atual.sala || listaSalas[0]?.nome || '' }));
       })
-      .catch(() => setErro('Não foi possível carregar as reservas e espaços.'));
+      .catch(() => setErro('Não foi possível carregar as reservas, espaços e recursos técnicos.'));
   }, []);
 
   const salaSelecionada = salas.find((sala) => sala.nome === form.sala);
@@ -85,11 +87,76 @@ export default function Reservas() {
     return conjugada ? [sala.nome, conjugada.nome] : [sala.nome];
   }
 
+  function recursosFixosParaSalas(nomesSalas) {
+    const salaIds = new Set(salas.filter((sala) => nomesSalas.includes(sala.nome)).map((sala) => sala.id));
+    return recursosTecnicos.filter((recurso) => recurso.salaId && salaIds.has(recurso.salaId));
+  }
+
+  function recursosDoEvento(dados) {
+    const nomesSalas = nomesSalasSelecionadas(dados.sala, dados.unirSalas);
+    const fixos = recursosFixosParaSalas(nomesSalas).map((recurso) => recurso.nome);
+    return [...new Set([...dados.recurso, ...fixos])];
+  }
+
+  function recursosLivres() {
+    return recursosTecnicos.filter((recurso) => !recurso.salaId);
+  }
+
+  const dataDisponibilidade = edicao ? edicao.data : converterDataParaISO(form.data);
+  const horaInicioDisponibilidade = edicao ? edicao.horaInicio : form.horaInicio;
+  const horaFimDisponibilidade = edicao ? edicao.horaFim : form.horaFim;
+  const idIgnoradoDisponibilidade = edicao?.id || '';
+
+  useEffect(() => {
+    if (!dataDisponibilidade || !horaInicioDisponibilidade || !horaFimDisponibilidade || horaFimDisponibilidade <= horaInicioDisponibilidade) {
+      setConflitosRecursos([]);
+      setErroDisponibilidade('');
+      setConsultandoDisponibilidade(false);
+      return undefined;
+    }
+
+    let ativo = true;
+    setConsultandoDisponibilidade(true);
+    setConflitosRecursos([]);
+    setErroDisponibilidade('');
+    api.get('/reservas/disponibilidade-recursos', {
+      params: {
+        data: dataDisponibilidade,
+        horaInicio: horaInicioDisponibilidade,
+        horaFim: horaFimDisponibilidade,
+        ...(idIgnoradoDisponibilidade ? { ignorarId: idIgnoradoDisponibilidade } : {}),
+      },
+    })
+      .then(({ data }) => {
+        if (ativo) setConflitosRecursos(data.conflitos);
+      })
+      .catch((requestError) => {
+        if (ativo) {
+          setConflitosRecursos([]);
+          setErroDisponibilidade(requestError.response?.data?.erro || 'Não foi possível consultar a disponibilidade dos recursos técnicos.');
+        }
+      })
+      .finally(() => {
+        if (ativo) setConsultandoDisponibilidade(false);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [dataDisponibilidade, horaInicioDisponibilidade, horaFimDisponibilidade, idIgnoradoDisponibilidade]);
+
+  function conflitoDoRecurso(nomeRecurso) {
+    return conflitosRecursos.find((conflito) => (
+      conflito.recurso.toLocaleLowerCase('pt-BR') === nomeRecurso.toLocaleLowerCase('pt-BR')
+    ));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setErro('');
     setMensagem('');
-    if (form.recurso.length === 0) {
+    const recursosSelecionados = recursosDoEvento(form);
+    if (recursosSelecionados.length === 0) {
       setErro('Adicione pelo menos um recurso técnico.');
       return;
     }
@@ -106,32 +173,19 @@ export default function Reservas() {
     try {
       const { data: eventoCriado } = await api.post('/reservas', {
         ...form,
+        recurso: recursosSelecionados,
         salas: nomesSalasSelecionadas(form.sala, form.unirSalas),
         nome: form.nome.trim(),
         data: dataISO,
       });
       setForm(initialForm);
-      setRecursoAtual('');
       setMensagem(user?.role === 'admin'
-        ? `Evento aprovado. A página do convidado está disponível no link de acesso do evento ${eventoCriado.codigo}.`
-        : `Solicitação enviada para aprovação do ADM. A página do convidado ${eventoCriado.codigo} ficará disponível após a aprovação.`);
+        ? `Evento aprovado. ${eventoCriado.reservado ? `Compartilhe o código ${eventoCriado.codigo} apenas com os convidados autorizados.` : `A página do convidado está disponível para o evento ${eventoCriado.codigo}.`}`
+        : `Solicitação enviada para aprovação do ADM. ${eventoCriado.reservado ? `Após a aprovação, compartilhe o código ${eventoCriado.codigo} apenas com os convidados autorizados.` : `A página do convidado ${eventoCriado.codigo} ficará disponível após a aprovação.`}`);
       await carregar();
     } catch (requestError) {
       setErro(requestError.response?.data?.erro || 'Não foi possível enviar a solicitação.');
     }
-  }
-
-  function adicionarRecurso(event) {
-    event.preventDefault();
-    const recurso = recursoAtual.trim();
-    if (!recurso) return;
-    if (form.recurso.some((item) => item.toLocaleLowerCase('pt-BR') === recurso.toLocaleLowerCase('pt-BR'))) {
-      setErro('Esse recurso técnico já foi adicionado.');
-      return;
-    }
-    setErro('');
-    setForm((atual) => ({ ...atual, recurso: [...atual.recurso, recurso] }));
-    setRecursoAtual('');
   }
 
   function iniciarEdicao(reserva) {
@@ -146,31 +200,23 @@ export default function Reservas() {
       horaFim: reserva.horaFim,
       sala: (reserva.salas ?? [reserva.sala])[0],
       unirSalas: (reserva.salas ?? [reserva.sala]).length > 1,
-      recurso: reserva.recurso.split(',').map((item) => item.trim()).filter(Boolean),
-      recursoAtual: '',
+      recurso: reserva.recurso.split(',').map((item) => item.trim()).filter((nome) => (
+        recursosTecnicos.some((recurso) => !recurso.salaId && recurso.nome.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))
+      )),
+      recursosNaoCadastrados: reserva.recurso.split(',').map((item) => item.trim()).filter((nome) => (
+        nome && !recursosTecnicos.some((recurso) => recurso.nome.toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))
+      )),
       palestrante: reserva.palestrante,
       brinde: reserva.brinde === 'Não haverá brinde' ? '' : reserva.brinde,
-      gerenciarAssentos: reserva.gerenciarAssentos,
+      reservado: reserva.reservado === true,
     });
-  }
-
-  function adicionarRecursoEdicao(event) {
-    event.preventDefault();
-    const recurso = edicao.recursoAtual.trim();
-    if (!recurso) return;
-    if (edicao.recurso.some((item) => item.toLocaleLowerCase('pt-BR') === recurso.toLocaleLowerCase('pt-BR'))) {
-      setErro('Esse recurso técnico já foi adicionado.');
-      return;
-    }
-    setErro('');
-    setEdicao((atual) => ({ ...atual, recurso: [...atual.recurso, recurso], recursoAtual: '' }));
   }
 
   async function salvarEdicao(event) {
     event.preventDefault();
     setErro('');
     setMensagem('');
-    if (!edicao.recurso.length) {
+    if (recursosDoEvento(edicao).length === 0) {
       setErro('Adicione pelo menos um recurso técnico.');
       return;
     }
@@ -183,6 +229,7 @@ export default function Reservas() {
     try {
       await api.patch(`/reservas/${edicao.id}`, {
         ...edicao,
+        recurso: recursosDoEvento(edicao),
         salas: nomesSalasSelecionadas(edicao.sala, edicao.unirSalas),
       });
       setEdicao(null);
@@ -213,34 +260,18 @@ export default function Reservas() {
     }
   }
 
-  async function salvarAssento(reserva, inscrito) {
-    const chave = `${reserva.id}-${inscrito.id}`;
-    const assento = assentos[chave]?.trim();
-    if (!assento) return;
-    setErro('');
-    setMensagem('');
-    setAssentoSalvando(chave);
-    try {
-      await api.patch(`/reservas/${reserva.id}/inscricoes/${inscrito.id}/assento`, { assento });
-      setMensagem(`Assento de ${inscrito.nome} atualizado.`);
-      await carregar();
-    } catch (requestError) {
-      setErro(requestError.response?.data?.erro || 'Não foi possível salvar o assento.');
-    } finally {
-      setAssentoSalvando('');
-    }
-  }
-
   const aprovadas = reservas.filter((reserva) => reserva.status === 'aprovada');
   const ocupacaoMedia = aprovadas.length
     ? Math.round(aprovadas.reduce((total, reserva) => total + reserva.ocupacaoPercentual, 0) / aprovadas.length)
     : 0;
+  const isAdmPrincipal = user?.role === 'admin' && user?.principal === true;
+  const podeGerenciarEvento = (reserva) => isAdmPrincipal || reserva.usuarioId === Number(user?.id);
 
   return <section>
     <div className="page-heading">
       <span className="eyebrow">{user?.role === 'admin' ? 'GESTÃO DE EVENTOS' : 'ÁREA DO ORGANIZADOR'}</span>
       <h1>{user?.role === 'admin' ? 'Reservas' : 'Minhas reservas'}</h1>
-      <p>{user?.role === 'admin' ? 'Cadastre eventos e acompanhe todas as solicitações.' : 'Solicite eventos, acompanhe suas decisões e consulte a ocupação dos espaços.'}</p>
+      <p>{isAdmPrincipal ? 'Cadastre eventos, consulte todos os eventos e gerencie qualquer um deles.' : user?.role === 'admin' ? 'Cadastre eventos e visualize somente as reservas que você criou.' : 'Solicite eventos, acompanhe suas decisões e consulte a ocupação dos espaços.'}</p>
     </div>
 
     <form className="form-panel booking-form" onSubmit={handleSubmit}>
@@ -252,22 +283,49 @@ export default function Reservas() {
       <label>Espaço<select value={form.sala} onChange={(event) => setForm({ ...form, sala: event.target.value, unirSalas: false })} required disabled={salas.length === 0}><option value="" disabled>Selecione um espaço</option>{salas.map((sala) => <option key={sala.id} value={sala.nome}>{sala.nome} · {sala.capacidade} lugares</option>)}</select></label>
       {salaConjugada && <label className="seat-management-toggle"><input type="checkbox" checked={Boolean(form.unirSalas)} onChange={(event) => setForm({ ...form, unirSalas: event.target.checked })} /><span><strong>Unir com {salaConjugada.nome}</strong><small>Capacidade total: {salaSelecionada.capacidade + salaConjugada.capacidade} pessoas.</small></span></label>}
       <div className="technical-resources-field">
-        <label htmlFor="technical-resource">Recursos técnicos</label>
-        <div className="technical-resource-entry">
-          <input id="technical-resource" value={recursoAtual} onChange={(event) => setRecursoAtual(event.target.value)} maxLength="80" placeholder="Ex.: projetor" />
-          <button className="link-button" type="button" onClick={adicionarRecurso}>Adicionar</button>
+        <strong>Recursos técnicos</strong>
+        <div className="technical-resource-picker">
+          {recursosFixosParaSalas(nomesSalasSelecionadas(form.sala, form.unirSalas)).map((recurso) => {
+            return <span className="technical-resource-selected fixed" key={recurso.id}>
+              {recurso.nome} · {recurso.categoria} · {recurso.status === 'manutencao' ? 'Manutenção' : 'OK'} · Fixo
+            </span>;
+          })}
+          {form.recurso.map((nomeRecurso) => <span className="technical-resource-selected" key={nomeRecurso}>
+              {nomeRecurso}
+              <button className="link-button" type="button" onClick={() => setForm((atual) => ({ ...atual, recurso: atual.recurso.filter((item) => item !== nomeRecurso) }))}>Remover</button>
+          </span>)}
+          <label>Selecionar recurso cadastrado
+            <select value="" onChange={(event) => {
+              const recurso = recursosTecnicos.find((item) => item.id === Number(event.target.value));
+              if (recurso && !form.recurso.includes(recurso.nome)) {
+                setForm((atual) => ({ ...atual, recurso: [...atual.recurso, recurso.nome] }));
+              }
+            }} disabled={recursosLivres().length === 0}>
+              <option value="">{recursosLivres().length ? 'Escolha um recurso...' : 'Nenhum recurso livre disponível'}</option>
+              {['Áudio', 'Vídeo', 'Informática', 'Iluminação', 'Outros'].map((categoria) => {
+                const recursosCategoria = recursosLivres().filter((recurso) => (
+                  (recurso.categoria || 'Outros') === categoria && !form.recurso.includes(recurso.nome)
+                ));
+                return recursosCategoria.length > 0 && <optgroup label={categoria} key={categoria}>
+                  {recursosCategoria.map((recurso) => {
+                    const emUso = Boolean(conflitoDoRecurso(recurso.nome));
+                    return <option key={recurso.id} value={recurso.id} disabled={emUso}>
+                      {recurso.nome} · {recurso.status === 'manutencao' ? 'Manutenção' : 'OK'}{emUso ? ' · Em uso' : ''}
+                    </option>;
+                  })}
+                </optgroup>;
+              })}
+            </select>
+          </label>
         </div>
-        {form.recurso.length > 0 && <ul className="technical-resource-list">
-          {form.recurso.map((recurso, index) => <li key={`${recurso}-${index}`}>
-            <span>{recurso}</span>
-            <button className="link-button" type="button" aria-label={`Remover ${recurso}`} onClick={() => setForm((atual) => ({ ...atual, recurso: atual.recurso.filter((_, itemIndex) => itemIndex !== index) }))}>Remover</button>
-          </li>)}
-        </ul>}
-        {form.recurso.length === 0 && <small>Adicione um ou mais recursos necessários para o evento.</small>}
+        {recursosTecnicos.length === 0 && <small>Nenhum recurso cadastrado. Cadastre recursos na opção Recursos técnicos antes de criar uma reserva.</small>}
+        {consultandoDisponibilidade && <small>Consultando disponibilidade...</small>}
+        {erroDisponibilidade && <small className="error" role="alert">{erroDisponibilidade}</small>}
+        <small>Selecione quantos recursos forem necessários; os fixados ao espaço são incluídos automaticamente.</small>
       </div>
       <label>Palestrante<input value={form.palestrante} onChange={(event) => setForm({ ...form, palestrante: event.target.value })} required /></label>
       <label>Brinde ao final (opcional)<input value={form.brinde} onChange={(event) => setForm({ ...form, brinde: event.target.value })} placeholder="Ex.: kit do evento" /></label>
-      <label className="seat-management-toggle"><input type="checkbox" checked={form.gerenciarAssentos} onChange={(event) => setForm({ ...form, gerenciarAssentos: event.target.checked })} /><span><strong>Gerenciar assentos</strong><small>Opcional. Permite atribuir um assento a cada convidado inscrito.</small></span></label>
+      <label className="seat-management-toggle"><input type="checkbox" checked={form.reservado} onChange={(event) => setForm({ ...form, reservado: event.target.checked })} /><span><strong>Evento reservado</strong><small>Não aparece na lista de eventos do convidado. Compartilhe o código do evento apenas com os convidados autorizados.</small></span></label>
       <button className="primary-button" type="submit">{user?.role === 'admin' ? 'Cadastrar evento' : 'Solicitar reserva'}</button>
     </form>
 
@@ -280,16 +338,16 @@ export default function Reservas() {
       <div className="summary-card"><span>Ocupação média aprovada</span><strong>{ocupacaoMedia}%</strong></div>
     </div>}
 
-    <h2>{user?.role === 'admin' ? 'Todas as reservas' : 'Histórico das minhas reservas'}</h2>
+    <h2>{isAdmPrincipal ? 'Eventos cadastrados' : 'Minhas reservas criadas'}</h2>
     <div className="reservation-list">
-      {reservas.length === 0 && <p className="empty">Ainda não há reservas para exibir.</p>}
+      {reservas.length === 0 && <p className="empty">Você ainda não criou reservas.</p>}
       {reservas.map((reserva) => <article className="reservation-item" key={reserva.id}>
         <div className="reservation-top">
-          <div><strong>{reserva.nome}</strong><small>{reserva.codigo} · Espaço {reserva.sala} · {formatarData(reserva.data)} · {reserva.horaInicio} – {reserva.horaFim} · {reserva.recurso}</small></div>
+          <div><strong>{reserva.nome}</strong><small>{reserva.codigo}{reserva.reservado ? ' · EVENTO RESERVADO' : ''} · Espaço {reserva.sala} · {formatarData(reserva.data)} · {reserva.horaInicio} – {reserva.horaFim} · {reserva.recurso}</small></div>
           <span className={`status ${reserva.status}`}>{reserva.status}</span>
         </div>
-        {reserva.usuarioId === Number(user?.id) && <EventShare codigo={reserva.codigo} />}
-        {reserva.usuarioId === Number(user?.id) && edicao?.id !== reserva.id && <div className="room-actions">
+        {reserva.usuarioId === Number(user?.id) && <EventShare codigo={reserva.codigo} reservado={reserva.reservado === true} />}
+        {podeGerenciarEvento(reserva) && edicao?.id !== reserva.id && <div className="room-actions">
           <button className="link-button account-promote" type="button" onClick={() => iniciarEdicao(reserva)}>Editar evento</button>
           <button className="link-button account-promote" type="button" disabled={excluindoReservaId === reserva.id} onClick={() => excluirEvento(reserva)}>{excluindoReservaId === reserva.id ? 'Excluindo...' : 'Excluir evento'}</button>
         </div>}
@@ -306,19 +364,50 @@ export default function Reservas() {
             return conjugadaEditada && <label className="seat-management-toggle"><input type="checkbox" checked={Boolean(edicao.unirSalas)} onChange={(event) => setEdicao({ ...edicao, unirSalas: event.target.checked })} /><span><strong>Unir com {conjugadaEditada.nome}</strong><small>Capacidade total: {salaEditada.capacidade + conjugadaEditada.capacidade} pessoas.</small></span></label>;
           })()}
           <div className="technical-resources-field">
-            <label htmlFor={`edit-resource-${reserva.id}`}>Recursos técnicos</label>
-            <div className="technical-resource-entry">
-              <input id={`edit-resource-${reserva.id}`} value={edicao.recursoAtual} onChange={(event) => setEdicao({ ...edicao, recursoAtual: event.target.value })} maxLength="80" placeholder="Ex.: projetor" />
-              <button className="link-button" type="button" onClick={adicionarRecursoEdicao}>Adicionar</button>
+            <strong>Recursos técnicos</strong>
+            {edicao.recursosNaoCadastrados.length > 0 && <small className="error">Recursos antigos não cadastrados não podem ser mantidos: {edicao.recursosNaoCadastrados.join(', ')}. Selecione os recursos disponíveis abaixo.</small>}
+            <div className="technical-resource-picker">
+              {recursosFixosParaSalas(nomesSalasSelecionadas(edicao.sala, edicao.unirSalas)).map((recurso) => {
+                return <span className="technical-resource-selected fixed" key={recurso.id}>
+                  {recurso.nome} · {recurso.categoria} · {recurso.status === 'manutencao' ? 'Manutenção' : 'OK'} · Fixo
+                </span>;
+              })}
+              {edicao.recurso.map((nomeRecurso) => <span className="technical-resource-selected" key={nomeRecurso}>
+                  {nomeRecurso}
+                  <button className="link-button" type="button" onClick={() => setEdicao((atual) => ({ ...atual, recurso: atual.recurso.filter((item) => item !== nomeRecurso) }))}>Remover</button>
+                </span>)}
+              <label>Selecionar recurso cadastrado
+                <select value="" onChange={(event) => {
+                  const recurso = recursosTecnicos.find((item) => item.id === Number(event.target.value));
+                  if (recurso && !edicao.recurso.includes(recurso.nome)) {
+                    setEdicao((atual) => ({ ...atual, recurso: [...atual.recurso, recurso.nome] }));
+                  }
+                }} disabled={recursosLivres().length === 0}>
+                  <option value="">{recursosLivres().length ? 'Escolha um recurso...' : 'Nenhum recurso livre disponível'}</option>
+                  {['Áudio', 'Vídeo', 'Informática', 'Iluminação', 'Outros'].map((categoria) => {
+                    const recursosCategoria = recursosLivres().filter((recurso) => (
+                      (recurso.categoria || 'Outros') === categoria && !edicao.recurso.includes(recurso.nome)
+                    ));
+                    return recursosCategoria.length > 0 && <optgroup label={categoria} key={categoria}>
+                      {recursosCategoria.map((recurso) => {
+                        const emUso = Boolean(conflitoDoRecurso(recurso.nome));
+                        return <option key={recurso.id} value={recurso.id} disabled={emUso}>
+                          {recurso.nome} · {recurso.status === 'manutencao' ? 'Manutenção' : 'OK'}{emUso ? ' · Em uso' : ''}
+                        </option>;
+                      })}
+                    </optgroup>;
+                  })}
+                </select>
+              </label>
             </div>
-            <ul className="technical-resource-list">{edicao.recurso.map((recurso, index) => <li key={`${recurso}-${index}`}>
-              <span>{recurso}</span>
-              <button className="link-button" type="button" aria-label={`Remover ${recurso}`} onClick={() => setEdicao({ ...edicao, recurso: edicao.recurso.filter((_, itemIndex) => itemIndex !== index) })}>Remover</button>
-            </li>)}</ul>
+            {recursosTecnicos.length === 0 && <small>Nenhum recurso cadastrado. Cadastre recursos na opção Recursos técnicos para editar este evento.</small>}
+            {consultandoDisponibilidade && <small>Consultando disponibilidade...</small>}
+            {erroDisponibilidade && <small className="error" role="alert">{erroDisponibilidade}</small>}
+            <small>Selecione quantos recursos forem necessários; os fixados ao espaço são incluídos automaticamente.</small>
           </div>
           <label>Palestrante<input value={edicao.palestrante} onChange={(event) => setEdicao({ ...edicao, palestrante: event.target.value })} required /></label>
           <label>Brinde ao final (opcional)<input value={edicao.brinde} onChange={(event) => setEdicao({ ...edicao, brinde: event.target.value })} /></label>
-          <label className="seat-management-toggle"><input type="checkbox" checked={edicao.gerenciarAssentos} onChange={(event) => setEdicao({ ...edicao, gerenciarAssentos: event.target.checked })} /><span><strong>Gerenciar assentos</strong><small>Permite atribuir assentos aos inscritos.</small></span></label>
+          <label className="seat-management-toggle"><input type="checkbox" checked={edicao.reservado} onChange={(event) => setEdicao({ ...edicao, reservado: event.target.checked })} /><span><strong>Evento reservado</strong><small>Oculta o evento da lista de convidados; o código precisa ser compartilhado com eles.</small></span></label>
           <div className="reservation-edit-actions">
             <button className="primary-button" type="submit" disabled={salvandoEdicao}>{salvandoEdicao ? 'Salvando...' : 'Salvar alterações'}</button>
             <button className="link-button" type="button" disabled={salvandoEdicao} onClick={() => setEdicao(null)}>Cancelar</button>
@@ -336,18 +425,6 @@ export default function Reservas() {
           <small>{reserva.participantes} de {reserva.capacidadeSala} lugares</small>
         </div>
         {reserva.status === 'rejeitada' && reserva.motivoRejeicao && <p className="rejection-reason"><strong>Motivo da rejeição:</strong> {reserva.motivoRejeicao}</p>}
-        {reserva.gerenciarAssentos && <div className="attendee-list">
-          <h3>Assentos dos inscritos</h3>
-          {reserva.inscritos.length === 0 && <p className="empty">Os assentos poderão ser definidos quando houver inscrições.</p>}
-          {reserva.inscritos.map((inscrito) => {
-            const chave = `${reserva.id}-${inscrito.id}`;
-            return <div className="attendee-row" key={inscrito.id}>
-              <div><strong>{inscrito.nome}</strong>{inscrito.email && <small>{inscrito.email}</small>}</div>
-              <label>Assento<input value={assentos[chave] ?? inscrito.assento ?? ''} onChange={(event) => setAssentos({ ...assentos, [chave]: event.target.value })} placeholder="Ex.: Fileira A, assento 03" /></label>
-              <button className="link-button account-promote" type="button" disabled={!assentos[chave]?.trim() || assentoSalvando === chave} onClick={() => salvarAssento(reserva, inscrito)}>{assentoSalvando === chave ? 'Salvando...' : 'Salvar assento'}</button>
-            </div>;
-          })}
-        </div>}
       </article>)}
     </div>
   </section>;

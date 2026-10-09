@@ -24,7 +24,7 @@ export default function Login() {
 
   return <div className="login-page"><form className="login-card" onSubmit={handleSubmit}>
     <span className="eyebrow">PORTAL DE EVENTOS</span><h1>Acesso</h1>
-    <p>Acesso exclusivo para administradores e organizadores.</p>
+    <p>Acesso exclusivo para ADM, Gestores e organizadores.</p>
     <label>Usuário<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
     <label>Senha<input type="password" value={senha} onChange={(event) => setSenha(event.target.value)} required /></label>
     {erro && <div className="error">{erro}</div>}
