@@ -1,0 +1,12 @@
+# Dependências instaladas localmente
+node_modules/
+
+# Saídas geradas pelo React
+frontend/build/
+
+# Arquivos de ambiente e logs
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
