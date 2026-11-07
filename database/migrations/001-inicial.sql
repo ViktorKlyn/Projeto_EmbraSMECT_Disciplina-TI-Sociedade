@@ -1,0 +1,1 @@
+-- Arquivo reservado para a primeira migração do banco de dados.
