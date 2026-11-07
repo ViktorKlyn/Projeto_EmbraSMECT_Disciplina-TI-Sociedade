@@ -1,0 +1,30 @@
+# Ignorar dependências
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cache do npm/yarn/pnpm
+.cache/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+
+# Arquivos temporários do sistema
+.DS_Store
+Thumbs.db
+
+# Ambiente local
+.env
+.env.local
+.env.*.local
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
