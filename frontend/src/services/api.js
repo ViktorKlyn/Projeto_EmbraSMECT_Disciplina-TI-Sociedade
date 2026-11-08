@@ -4,12 +4,10 @@ const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000',
 });
 
-// Interceptor para adicionar o token de autorização
 api.interceptors.request.use((config) => {
-  const usuarioLogado = localStorage.getItem('embrasmect_user_id');
-  if (usuarioLogado) {
-    config.headers.Authorization = `Bearer ${usuarioLogado}`;
-  }
+  const token = localStorage.getItem('embrasmect_token')
+    || sessionStorage.getItem('embrasmect_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 

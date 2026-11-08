@@ -1,40 +1,21 @@
 const db = require('../config/db');
+const { obterSegredoSessao, verificarTokenSessao } = require('../services/authService');
 
 function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'] || req.headers['x-user-id'];
-  let userId = null;
-
-  if (authHeader) {
-    if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
-      const token = authHeader.slice(7).trim();
-      userId = parseInt(token, 10);
-      if (isNaN(userId) && token.startsWith('user-')) {
-        userId = parseInt(token.replace('user-', ''), 10);
-      }
-    } else {
-      userId = parseInt(authHeader, 10);
-    }
+  if (!obterSegredoSessao()) {
+    return res.status(503).json({ erro: 'A autenticação não está configurada no servidor.' });
   }
 
-  // Se não fornecido nos headers, verifica se veio no query param para testes facilitados
-  if (!userId && req.query.usuario_id) {
-    userId = parseInt(req.query.usuario_id, 10);
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  const sessao = verificarTokenSessao(token);
+  if (!sessao) {
+    return res.status(401).json({ erro: 'Sessão inválida ou expirada.' });
   }
 
-  if (!userId || isNaN(userId)) {
-    return res.status(401).json({
-      erro: 'Não autorizado. Autenticação obrigatória (forneça o header Authorization: Bearer <id> ou x-user-id).',
-      status: 401,
-    });
-  }
-
-  const user = db.prepare('SELECT id, nome, email, perfil FROM usuarios WHERE id = ?').get(userId);
-
+  const user = db.prepare('SELECT id, nome, email, perfil FROM usuarios WHERE id = ?').get(sessao.usuarioId);
   if (!user) {
-    return res.status(401).json({
-      erro: 'Usuário não encontrado ou credencial inválida.',
-      status: 401,
-    });
+    return res.status(401).json({ erro: 'Usuário não encontrado para esta sessão.' });
   }
 
   req.user = user;

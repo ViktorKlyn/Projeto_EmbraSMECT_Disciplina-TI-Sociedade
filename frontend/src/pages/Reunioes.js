@@ -13,12 +13,12 @@ import {
   IconX,
 } from '../components/Icons';
 
-function Reunioes({ usuarioAtual, usuarioId, aoTrocarUsuario, exibirToast }) {
+function Reunioes({ usuarioId, exibirToast }) {
   const [reunioes, setReunioes] = useState([]);
-  const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState(false);
   const [googleConectado, setGoogleConectado] = useState(false);
+  const [googleConfigurado, setGoogleConfigurado] = useState(false);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [novaReuniao, setNovaReuniao] = useState({
     titulo: '',
@@ -33,14 +33,12 @@ function Reunioes({ usuarioAtual, usuarioId, aoTrocarUsuario, exibirToast }) {
   async function carregarDados() {
     try {
       setCarregando(true);
-      const [resReunioes, resUsuarios, resPedidos] = await Promise.all([
+      const [resReunioes, resPedidos] = await Promise.all([
         api.get('/api/reunioes'),
-        api.get('/api/usuarios'),
         api.get('/api/pedidos/meus'),
       ]);
 
       setReunioes(resReunioes.data.reunioes || []);
-      setUsuarios(resUsuarios.data.usuarios || []);
       setNotificacoes(resPedidos.data || { enviados: [], recebidos: [], pendentesParaAprovar: 0 });
     } catch (err) {
       console.error('Erro ao buscar dados de reuniões:', err);
@@ -59,7 +57,10 @@ function Reunioes({ usuarioAtual, usuarioId, aoTrocarUsuario, exibirToast }) {
 
   useEffect(() => {
     api.get('/api/google-calendar/status')
-      .then(({ data }) => setGoogleConectado(data.conectado))
+      .then(({ data }) => {
+        setGoogleConfigurado(data.configurado);
+        setGoogleConectado(data.conectado);
+      })
       .catch((err) => exibirToast(err.response?.data?.erro || 'Não foi possível verificar o Google Agenda.', 'erro'));
 
     const parametros = new URLSearchParams(window.location.search);
@@ -197,24 +198,6 @@ function Reunioes({ usuarioAtual, usuarioId, aoTrocarUsuario, exibirToast }) {
           </p>
         </div>
 
-        {/* Seletor de Perfil / Usuário Ativo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#ffffff', padding: '0.5rem 1rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-sm)' }}>
-          <IconUser size={18} style={{ color: 'var(--primary-600)' }} />
-          <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontWeight: 600 }}>Perfil em Teste:</div>
-            <select
-              value={usuarioId}
-              onChange={(e) => aoTrocarUsuario(parseInt(e.target.value, 10))}
-              style={{ border: 'none', background: 'transparent', fontWeight: 700, color: 'var(--slate-800)', cursor: 'pointer', outline: 'none' }}
-            >
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nome} ({u.perfil})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
       </div>
 
       <div className="card" style={{ marginBottom: '1.25rem' }}>
@@ -222,20 +205,26 @@ function Reunioes({ usuarioAtual, usuarioId, aoTrocarUsuario, exibirToast }) {
           <div>
             <h2 style={{ margin: 0 }}>Google Agenda</h2>
             <p style={{ margin: '0.35rem 0 0', color: 'var(--slate-600)' }}>
-              {googleConectado ? 'Conta Google conectada.' : 'Conecte sua conta para sincronizar seus eventos.'}
+              {!googleConfigurado
+                ? 'A integração ainda não está configurada neste servidor.'
+                : googleConectado
+                  ? 'Conta Google conectada.'
+                  : 'Conecte sua conta para sincronizar seus eventos.'}
             </p>
-            <p style={{ margin: '0.35rem 0 0', color: 'var(--amber-700)', fontSize: '0.8rem' }}>
-              Protótipo acadêmico: o login do sistema é demonstrativo e não deve ser usado para proteger contas reais.
+            <p style={{ margin: '0.35rem 0 0', color: 'var(--slate-600)', fontSize: '0.8rem' }}>
+              {!googleConfigurado
+                ? 'Configure as credenciais OAuth do Google no backend e reinicie o servidor.'
+                : 'A agenda conectada pertence à conta Google que você autorizar.'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {googleConectado ? (
-              <button type="button" className="btn btn-secondary" onClick={sincronizarGoogle}>
+              <button type="button" className="btn btn-secondary" onClick={sincronizarGoogle} disabled={!googleConfigurado}>
                 <IconCalendar size={16} />
                 <span>Sincronizar eventos</span>
               </button>
             ) : (
-              <button type="button" className="btn btn-primary" onClick={conectarGoogle}>
+              <button type="button" className="btn btn-primary" onClick={conectarGoogle} disabled={!googleConfigurado}>
                 <IconCalendar size={16} />
                 <span>Conectar Google Agenda</span>
               </button>

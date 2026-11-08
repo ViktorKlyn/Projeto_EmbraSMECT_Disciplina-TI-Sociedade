@@ -7,7 +7,7 @@ import {
   IconUser,
 } from './Icons';
 
-function Header({ navegar, usuario, paginaAtiva, aoSair }) {
+function Header({ navegar, usuario, perfil, paginaAtiva, aoSair }) {
   // Pega as iniciais do usuário para o avatar
   const iniciais = (usuario || 'U')
     .split(' ')
@@ -58,14 +58,16 @@ function Header({ navegar, usuario, paginaAtiva, aoSair }) {
           Relatórios
         </button>
 
-        <button
-          type="button"
-          className={`nav-link ${paginaAtiva === 'aprovacao' ? 'active' : ''}`}
-          onClick={() => navegar('aprovacao')}
-        >
-          <IconCheckCircle size={16} />
-          Aprovação
-        </button>
+        {['admin', 'gestor'].includes(perfil) && (
+          <button
+            type="button"
+            className={`nav-link ${paginaAtiva === 'aprovacao' ? 'active' : ''}`}
+            onClick={() => navegar('aprovacao')}
+          >
+            <IconCheckCircle size={16} />
+            Aprovação
+          </button>
+        )}
 
         <button
           type="button"

@@ -1,7 +1,14 @@
 // Suíte Completa de Testes Automatizados de QA: Regras de Negócio e Casos de Borda de Reuniões
 const assert = require('node:assert');
+const { once } = require('node:events');
+require('./testDatabase').assertIsolatedTestDatabase();
+const app = require('../src/server');
+const db = require('../src/config/db');
+const { dataFuturaISO } = require('./testDatabase');
+const { criarTokenSessao } = require('../src/services/authService');
 
-const BASE_URL = 'http://localhost:3000/api';
+let BASE_URL;
+let server;
 
 async function request(path, options = {}) {
   const url = `${BASE_URL}${path}`;
@@ -9,6 +16,10 @@ async function request(path, options = {}) {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
+  const usuarioId = headers.Authorization?.match(/^Bearer (\d+)$/)?.[1];
+  if (usuarioId) {
+    headers.Authorization = `Bearer ${criarTokenSessao({ id: Number(usuarioId) })}`;
+  }
 
   const response = await fetch(url, {
     method: options.method || 'GET',
@@ -32,7 +43,9 @@ async function runTests() {
   console.log(' AUDITORIA COMPLETA DE QA: REGRAS DE REUNIÕES PÚBLICAS / PRIVADAS ');
   console.log('======================================================================\n');
 
-  const db = require('../src/config/db');
+  server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  BASE_URL = `http://127.0.0.1:${server.address().port}/api`;
   const { obterDataLocalISO } = require('../src/controllers/reuniaoController');
 
   // Limpeza de estado para garantir idempotência antes de iniciar os testes
@@ -42,6 +55,7 @@ async function runTests() {
   db.prepare('DELETE FROM participantes_reuniao WHERE reuniao_id = 2 AND usuario_id != 1').run();
   db.prepare("UPDATE reunioes SET tipo = 'publica' WHERE id = 1").run();
   db.prepare("UPDATE reunioes SET tipo = 'privada' WHERE id = 2").run();
+  db.prepare('UPDATE reunioes SET data_reuniao = ? WHERE id IN (1, 2, 4)').run(dataFuturaISO(30));
   db.prepare("INSERT OR IGNORE INTO lideres_reuniao (reuniao_id, usuario_id) VALUES (1, 3)").run();
   db.prepare("INSERT OR IGNORE INTO lideres_reuniao (reuniao_id, usuario_id) VALUES (2, 2)").run();
 
@@ -137,7 +151,7 @@ async function runTests() {
   // 7. Chamada direta à API para reunião privada sem permissão
   await testCase(7, 'Acesso direto à API de reunião privada por usuário não participante/não convidado -> Bloqueado com 403', async () => {
     // Reunião temporária estritamente secreta
-    const rTemp = db.prepare("INSERT INTO reunioes (titulo, sala_id, criador_id, data_reuniao, hora_inicio, hora_fim, tipo, status) VALUES ('Diretoria Sigilosa', 1, 1, '2026-10-30', '14:00', '15:00', 'privada', 'ativa')").run();
+    const rTemp = db.prepare("INSERT INTO reunioes (titulo, sala_id, criador_id, data_reuniao, hora_inicio, hora_fim, tipo, status) VALUES ('Diretoria Sigilosa', 1, 1, ?, '14:00', '15:00', 'privada', 'ativa')").run(dataFuturaISO(35));
     const tempId = rTemp.lastInsertRowid;
 
     // Bruno (id: 4, sem convite e não participante) tenta acessar GET /api/reunioes/:id
@@ -176,7 +190,7 @@ async function runTests() {
 
   // 9. Reunião muda de pública para privada com pedidos pendentes
   await testCase(9, 'Reunião muda de pública para privada -> Pedidos pendentes são cancelados/recusados por segurança', async () => {
-    const rPublica = db.prepare("INSERT INTO reunioes (titulo, sala_id, criador_id, data_reuniao, hora_inicio, hora_fim, tipo, status) VALUES ('Mesa Redonda Aberta', 1, 1, '2026-11-15', '14:00', '15:00', 'publica', 'ativa')").run();
+    const rPublica = db.prepare("INSERT INTO reunioes (titulo, sala_id, criador_id, data_reuniao, hora_inicio, hora_fim, tipo, status) VALUES ('Mesa Redonda Aberta', 1, 1, ?, '14:00', '15:00', 'publica', 'ativa')").run(dataFuturaISO(35));
     const pubId = rPublica.lastInsertRowid;
 
     // Bruno envia pedido pendente
@@ -258,6 +272,27 @@ async function runTests() {
   console.log('\n======================================================================');
   console.log(` RESULTADO FINAL: ${passed} / ${total} CASOS DE TESTE PASSARAM COM SUCESSO! `);
   console.log('======================================================================');
+  await fecharRecursos();
+  if (passed !== total) {
+    throw new Error(`${total - passed} caso(s) de teste falharam.`);
+  }
 }
 
-runTests().catch(console.error);
+async function fecharRecursos() {
+  if (server) {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    server = null;
+  }
+  db.close();
+}
+
+runTests().catch(async (erro) => {
+  console.error(erro);
+  try {
+    await fecharRecursos();
+  } catch (erroFechamento) {
+    console.error('Falha ao fechar recursos de teste:', erroFechamento);
+  }
+  process.exitCode = 1;
+});

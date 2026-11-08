@@ -1,7 +1,9 @@
 CREATE TABLE usuarios (
 	id INTEGER PRIMARY KEY,
 	nome VARCHAR(100) NOT NULL,
-	email VARCHAR(150) NOT NULL UNIQUE
+	email VARCHAR(150) NOT NULL UNIQUE,
+	perfil TEXT NOT NULL DEFAULT 'comum',
+	senha_hash TEXT
 );
 
 CREATE TABLE salas (

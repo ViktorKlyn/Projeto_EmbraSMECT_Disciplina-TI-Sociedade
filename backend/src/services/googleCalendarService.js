@@ -24,6 +24,15 @@ function exigirConfiguracaoOAuth() {
   }
 }
 
+function configurado() {
+  return Boolean(
+    CLIENT_ID &&
+    CLIENT_SECRET &&
+    TOKEN_ENCRYPTION_KEY &&
+    /^[a-f0-9]{64}$/i.test(TOKEN_ENCRYPTION_KEY)
+  );
+}
+
 function criptografarToken(token) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(TOKEN_ENCRYPTION_KEY, 'hex'), iv);
@@ -293,6 +302,7 @@ function urlRetorno(status) {
 }
 
 module.exports = {
+  configurado,
   criarUrlAutorizacao,
   concluirAutorizacao,
   obterStatus,

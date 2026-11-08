@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   IconBuilding,
   IconCalendar,
@@ -9,17 +9,8 @@ import {
   IconAlertCircle,
   IconCheckCircle,
 } from '../components/Icons';
-
-const SALAS_PRESET = [
-  '1 (Tropical)',
-  '2 (Doko)',
-  '3 (Conquista)',
-  '4 (Uirapuru)',
-  '5 (Pintado)',
-  '6 (Vencedora)',
-  '7 (Tracajá)',
-  'Auditório Principal',
-];
+import { dataLocalISO, formatarDataAgenda, somarDiasISO } from '../utils/date';
+import api from '../services/api';
 
 const RECURSOS_PRESET = [
   'Projetor 4K',
@@ -29,8 +20,12 @@ const RECURSOS_PRESET = [
   'Quadro Branco',
 ];
 
-function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
-  const hoje = new Date().toISOString().split('T')[0];
+function Reservas({ reservas = [], adicionarReserva, editarReserva, cancelarReserva, usuarioId, perfil }) {
+  const hoje = dataLocalISO();
+  const [salas, setSalas] = useState([]);
+  const [erroSalas, setErroSalas] = useState('');
+  const [novaSala, setNovaSala] = useState({ nome: '', capacidade: '' });
+  const [reservaEditandoId, setReservaEditandoId] = useState(null);
   const [formulario, setFormulario] = useState({
     data: '',
     sala: '',
@@ -39,6 +34,14 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
 
   const [filtroStatus, setFiltroStatus] = useState('Todas');
   const [busca, setBusca] = useState('');
+
+  useEffect(() => {
+    api.get('/api/salas')
+      .then(({ data }) => setSalas(data.salas))
+      .catch((erro) => {
+        setErroSalas(erro.response?.data?.erro || 'Não foi possível carregar as salas cadastradas.');
+      });
+  }, []);
 
   function atualizarCampo(event) {
     setFormulario({ ...formulario, [event.target.name]: event.target.value });
@@ -53,24 +56,54 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
   }
 
   function definirDataRapida(diasAFrente) {
-    const data = new Date();
-    data.setDate(data.getDate() + diasAFrente);
-    const iso = data.toISOString().split('T')[0];
-    setFormulario((f) => ({ ...f, data: iso }));
+    setFormulario((f) => ({ ...f, data: somarDiasISO(hoje, diasAFrente) }));
+  }
+
+  function iniciarEdicao(reserva) {
+    setReservaEditandoId(reserva.id);
+    setFormulario({
+      data: reserva.data,
+      sala: reserva.sala,
+      recurso: reserva.recurso || '',
+    });
+  }
+
+  function cancelarEdicao() {
+    setReservaEditandoId(null);
+    setFormulario({ data: '', sala: '', recurso: '' });
+  }
+
+  async function cadastrarSala(event) {
+    event.preventDefault();
+    setErroSalas('');
+    try {
+      const { data } = await api.post('/api/salas', {
+        nome: novaSala.nome.trim(),
+        capacidade: Number(novaSala.capacidade),
+      });
+      setSalas((salasAtuais) => [...salasAtuais, data.sala].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+      setFormulario((atual) => ({ ...atual, sala: data.sala.nome }));
+      setNovaSala({ nome: '', capacidade: '' });
+    } catch (erro) {
+      setErroSalas(erro.response?.data?.erro || 'Não foi possível cadastrar a sala.');
+    }
   }
 
   async function enviarFormulario(event) {
     event.preventDefault();
     if (!formulario.data || !formulario.sala.trim()) return;
 
-    const sucesso = await adicionarReserva({
+    const dados = {
       ...formulario,
       sala: formulario.sala.trim(),
       recurso: formulario.recurso.trim() || 'Nenhum recurso especial',
-    });
+    };
+    const sucesso = reservaEditandoId
+      ? await editarReserva(reservaEditandoId, dados)
+      : await adicionarReserva(dados);
 
     if (sucesso) {
-      setFormulario({ data: '', sala: '', recurso: '' });
+      cancelarEdicao();
     }
   }
 
@@ -95,6 +128,14 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
     Aprovada: reservas.filter((r) => r.status === 'Aprovada').length,
     Rejeitada: reservas.filter((r) => r.status === 'Rejeitada').length,
   };
+  const agendaQuatorzeDias = Array.from({ length: 14 }, (_, indice) => {
+    const data = somarDiasISO(hoje, indice);
+    return {
+      data,
+      titulo: formatarDataAgenda(data),
+      reservas: reservas.filter((reserva) => reserva.data === data && reserva.status !== 'Rejeitada'),
+    };
+  });
 
   return (
     <section className="page reservations-page" aria-label="Gestão de Reservas">
@@ -107,12 +148,86 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
         </div>
       </div>
 
+      <section className="card" aria-labelledby="salas-cadastradas">
+        <div className="form-header">
+          <h2 id="salas-cadastradas">Salas cadastradas</h2>
+          <p>Consulte os espaços disponíveis e suas capacidades.</p>
+        </div>
+        {erroSalas && <p role="alert" className="status status-rejeitada">{erroSalas}</p>}
+        <ul style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', paddingLeft: '1.25rem' }}>
+          {salas.map((sala) => (
+            <li key={sala.id}>{sala.nome} — capacidade: {sala.capacidade}</li>
+          ))}
+          {salas.length === 0 && !erroSalas && <li>Carregando salas...</li>}
+        </ul>
+        {perfil === 'admin' && (
+          <form onSubmit={cadastrarSala}>
+            <h3>Cadastrar sala</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'end' }}>
+              <div className="form-group" style={{ flex: '1 1 220px', marginBottom: 0 }}>
+                <label htmlFor="nova-sala-nome">Nome</label>
+                <input
+                  id="nova-sala-nome"
+                  className="form-input"
+                  value={novaSala.nome}
+                  onChange={(event) => setNovaSala((atual) => ({ ...atual, nome: event.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ flex: '0 1 150px', marginBottom: 0 }}>
+                <label htmlFor="nova-sala-capacidade">Capacidade</label>
+                <input
+                  id="nova-sala-capacidade"
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="form-input"
+                  value={novaSala.capacidade}
+                  onChange={(event) => setNovaSala((atual) => ({ ...atual, capacidade: event.target.value }))}
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary">Cadastrar sala</button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      <section className="card" aria-labelledby="agenda-duas-semanas">
+        <div className="form-header">
+          <h2 id="agenda-duas-semanas">Agenda dos próximos 14 dias</h2>
+          <p>As reservas ocupam o dia inteiro. Solicitações pendentes e aprovadas bloqueiam a sala.</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+          {agendaQuatorzeDias.map((dia) => (
+            <article key={dia.data} className="reservation-card" aria-label={`Agenda de ${dia.titulo}`}>
+              <div>
+                <h3 style={{ margin: '0 0 0.6rem', textTransform: 'capitalize' }}>{dia.titulo}</h3>
+                {dia.reservas.length === 0 ? (
+                  <p style={{ margin: 0 }}>Sem reservas</p>
+                ) : (
+                  dia.reservas.map((reserva) => (
+                    <div key={reserva.id} style={{ marginBottom: '0.5rem' }}>
+                      <strong>{reserva.sala}</strong>
+                      <span className={`status status-${reserva.status.toLowerCase()}`} style={{ marginLeft: '0.5rem' }}>
+                        {reserva.status}
+                      </span>
+                      <div>{reserva.recurso || 'Padrão da sala'}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <div className="reservas-layout">
         {/* Formulário de Criação de Reserva */}
         <div className="card">
           <div className="form-header">
-            <h2>Nova Solicitação de Reserva</h2>
-            <p>Preencha os dados abaixo para enviar para aprovação.</p>
+            <h2>{reservaEditandoId ? 'Editar Reserva' : 'Nova Solicitação de Reserva'}</h2>
+            <p>{reservaEditandoId ? 'Atualize os dados da sua solicitação.' : 'Preencha os dados abaixo para enviar para aprovação.'}</p>
           </div>
 
           <form onSubmit={enviarFormulario}>
@@ -173,9 +288,9 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
                   required
                 >
                   <option value="">Selecione uma sala</option>
-                  {SALAS_PRESET.map((sala) => (
-                    <option key={sala} value={sala}>
-                      {sala}
+                  {salas.map((sala) => (
+                    <option key={sala.id} value={sala.nome}>
+                      {sala.nome}
                     </option>
                   ))}
                 </select>
@@ -216,9 +331,19 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
               className="btn btn-primary"
               style={{ width: '100%', marginTop: '1.25rem' }}
             >
-              <IconPlus size={18} />
-              <span>Confirmar Solicitação de Reserva</span>
+              {!reservaEditandoId && <IconPlus size={18} />}
+              <span>{reservaEditandoId ? 'Salvar alterações' : 'Confirmar Solicitação de Reserva'}</span>
             </button>
+            {reservaEditandoId && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: '100%', marginTop: '0.5rem' }}
+                onClick={cancelarEdicao}
+              >
+                Cancelar edição
+              </button>
+            )}
           </form>
         </div>
 
@@ -286,7 +411,18 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
                     <span className={`status status-${reserva.status.toLowerCase()}`}>
                       {reserva.status}
                     </span>
-                    {cancelarReserva && (
+                    {reserva.usuarioId === usuarioId && (
+                      <>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                        onClick={() => iniciarEdicao(reserva)}
+                        title="Editar esta reserva"
+                      >
+                        Editar
+                      </button>
+                      {cancelarReserva && (
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
@@ -300,6 +436,8 @@ function Reservas({ reservas = [], adicionarReserva, cancelarReserva }) {
                       >
                         Cancelar
                       </button>
+                      )}
+                      </>
                     )}
                   </div>
                 </div>

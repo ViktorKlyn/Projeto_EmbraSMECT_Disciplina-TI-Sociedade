@@ -1,10 +1,32 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 
-const dbPath = path.resolve(
-  process.env.DATABASE_PATH || path.resolve(__dirname, '../../../database/embrasmect.db')
-);
+const defaultDbPath = path.resolve(__dirname, '../../../database/embrasmect.db');
+if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
+  throw new Error('Testes exigem DATABASE_PATH explícito para um SQLite temporário.');
+}
+
+const dbPath = path.resolve(process.env.DATABASE_PATH || defaultDbPath);
+if (process.env.NODE_ENV === 'test') {
+  const tempPath = fs.realpathSync(path.resolve(os.tmpdir()));
+  const dbDirectory = path.dirname(dbPath);
+  if (!fs.existsSync(dbDirectory)) {
+    throw new Error('A pasta temporária de DATABASE_PATH deve existir antes de iniciar os testes.');
+  }
+  const physicalDbPath = fs.existsSync(dbPath)
+    ? fs.realpathSync(dbPath)
+    : path.join(fs.realpathSync(dbDirectory), path.basename(dbPath));
+  const relativeToTemp = path.relative(tempPath, physicalDbPath);
+  const persistentPath = physicalDbPath.toLowerCase() === defaultDbPath.toLowerCase();
+  const outsideTemp = relativeToTemp === '..'
+    || relativeToTemp.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relativeToTemp);
+  if (persistentPath || outsideTemp) {
+    throw new Error('Testes só podem abrir DATABASE_PATH dentro de uma pasta temporária.');
+  }
+}
 const dbDir = path.dirname(dbPath);
 
 if (!fs.existsSync(dbDir)) {
@@ -15,6 +37,7 @@ const db = new DatabaseSync(dbPath);
 
 // Habilita chaves estrangeiras
 db.exec('PRAGMA foreign_keys = ON;');
+db.exec('PRAGMA busy_timeout = 5000;');
 
 // Criação das tabelas base
 db.exec(`
@@ -22,7 +45,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
-    perfil TEXT NOT NULL DEFAULT 'comum'
+    perfil TEXT NOT NULL DEFAULT 'comum',
+    senha_hash TEXT
   );
 
   CREATE TABLE IF NOT EXISTS salas (
@@ -109,6 +133,11 @@ db.exec(`
     UNIQUE (usuario_id, evento_id)
   );
 `);
+
+const colunasUsuario = db.prepare('PRAGMA table_info(usuarios)').all();
+if (!colunasUsuario.some((coluna) => coluna.name === 'senha_hash')) {
+  db.exec('ALTER TABLE usuarios ADD COLUMN senha_hash TEXT;');
+}
 
 // Migração segura para tabelas já existentes
 try {

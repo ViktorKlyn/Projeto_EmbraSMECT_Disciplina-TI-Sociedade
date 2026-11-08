@@ -29,8 +29,10 @@ app.use((err, req, res, next) => {
 	});
 });
 
-app.listen(config.port, () => {
-	console.log(`Embrapa Meeting API rodando em http://localhost:${config.port}`);
-});
+if (require.main === module) {
+	app.listen(config.port, () => {
+		console.log(`Embrapa Meeting API rodando em http://localhost:${config.port}`);
+	});
+}
 
 module.exports = app;

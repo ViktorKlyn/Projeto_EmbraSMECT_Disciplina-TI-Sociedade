@@ -1,12 +1,13 @@
 const express = require('express');
 const reuniaoController = require('../controllers/reuniaoController');
 const reservasController = require('../controllers/reservasController');
+const salasController = require('../controllers/salasController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 // Rotas públicas ou utilitárias
-router.get('/usuarios', reuniaoController.listarUsuarios);
+router.get('/usuarios', authMiddleware, reuniaoController.listarUsuarios);
 
 // Reuniões (com autenticação)
 router.get('/reunioes', authMiddleware, reuniaoController.listarReunioes);
@@ -26,7 +27,10 @@ router.patch('/convites/:id', authMiddleware, reuniaoController.responderConvite
 router.get('/pedidos/meus', authMiddleware, reuniaoController.listarMeusPedidos);
 
 router.get('/reservas', authMiddleware, reservasController.listar);
+router.get('/salas', authMiddleware, salasController.listar);
+router.post('/salas', authMiddleware, salasController.criar);
 router.post('/reservas', authMiddleware, reservasController.criar);
+router.patch('/reservas/:id', authMiddleware, (req, res, next) => reservasController.editar(req, res).catch(next));
 router.patch('/reservas/:id/status', authMiddleware, reservasController.atualizarStatus);
 router.delete('/reservas/:id', authMiddleware, reservasController.cancelar);
 

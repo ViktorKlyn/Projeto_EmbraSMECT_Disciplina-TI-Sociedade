@@ -7,38 +7,34 @@ import {
   IconSparkles,
   IconShieldCheck,
 } from '../components/Icons';
+import api from '../services/api';
 
 function Login({ entrar }) {
-  const [usuario, setUsuario] = useState('');
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [lembrar, setLembrar] = useState(true);
   const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
-  function enviarFormulario(event) {
+  async function enviarFormulario(event) {
     event.preventDefault();
     setErro('');
 
-    const usuarioLimpo = usuario.trim();
-    const senhaLimpa = senha.trim();
-
-    if (!usuarioLimpo) {
-      setErro('Por favor, informe seu usuário ou e-mail cadastrado.');
+    if (!email.trim() || senha.length < 12) {
+      setErro('Informe seu e-mail cadastrado e uma senha com pelo menos 12 caracteres.');
       return;
     }
 
-    if (senhaLimpa.length < 4) {
-      setErro('A senha deve possuir no mínimo 4 caracteres.');
-      return;
+    setCarregando(true);
+    try {
+      const { data } = await api.post('/api/login', { email: email.trim(), senha });
+      entrar(data, lembrar);
+    } catch (loginError) {
+      setErro(loginError.response?.data?.erro || 'Não foi possível entrar. Verifique a conexão com a API.');
+    } finally {
+      setCarregando(false);
     }
-
-    entrar(usuarioLimpo);
-  }
-
-  function preencherDemo(nome, pass = '123456') {
-    setUsuario(nome);
-    setSenha(pass);
-    setErro('');
   }
 
   return (
@@ -78,20 +74,21 @@ function Login({ entrar }) {
 
       <form onSubmit={enviarFormulario}>
         <div className="form-group">
-          <label htmlFor="usuario">Usuário ou E-mail</label>
+          <label htmlFor="email">E-mail</label>
           <div className="input-with-icon">
             <span className="input-icon-left">
               <IconUser size={18} />
             </span>
             <input
-              id="usuario"
+              id="email"
               className="form-input"
-              type="text"
-              placeholder="Ex.: gustavo.silva"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
+              type="email"
+              placeholder="voce@exemplo.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
+              autoComplete="username"
             />
           </div>
         </div>
@@ -109,7 +106,9 @@ function Login({ entrar }) {
               placeholder="Digite sua senha"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
+              minLength={12}
               required
+              autoComplete="current-password"
             />
             <button
               type="button"
@@ -137,39 +136,15 @@ function Login({ entrar }) {
           </span>
         </div>
 
-        <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.85rem' }}>
-          <span>Entrar no Sistema</span>
+        <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.85rem' }} disabled={carregando}>
+          <span>{carregando ? 'Verificando...' : 'Entrar no Sistema'}</span>
           <IconArrowRight size={18} />
         </button>
       </form>
 
-      <div className="quick-demo-box">
-        <span style={{ fontSize: '0.78rem', color: 'var(--slate-500)', textAlign: 'center' }}>
-          Ambiente de Demonstração Rápida:
-        </span>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            type="button"
-            className="quick-demo-btn"
-            style={{ flex: 1 }}
-            onClick={() => preencherDemo('Gustavo Silva')}
-          >
-            <span>Gustavo (Admin)</span>
-          </button>
-          <button
-            type="button"
-            className="quick-demo-btn"
-            style={{ flex: 1 }}
-            onClick={() => preencherDemo('Prof. Ricardo')}
-          >
-            <span>Prof. Ricardo</span>
-          </button>
-        </div>
-      </div>
-
       <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--slate-400)', fontSize: '0.75rem' }}>
         <IconShieldCheck size={14} />
-        <span>Conexão criptografada e segura</span>
+        <span>Acesso protegido por credenciais individuais</span>
       </div>
     </section>
   );

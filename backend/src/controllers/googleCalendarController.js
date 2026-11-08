@@ -29,7 +29,10 @@ async function callback(req, res) {
 }
 
 function status(req, res) {
-  return res.json({ conectado: googleCalendar.obterStatus(req.user.id) });
+  return res.json({
+    configurado: googleCalendar.configurado(),
+    conectado: googleCalendar.obterStatus(req.user.id),
+  });
 }
 
 async function sincronizar(req, res) {

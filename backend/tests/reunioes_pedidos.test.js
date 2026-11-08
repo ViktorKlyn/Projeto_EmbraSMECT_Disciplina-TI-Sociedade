@@ -1,7 +1,14 @@
 // Teste Automatizado de QA para o Item 7: Pedidos de Participação em Reunião
 const assert = require('node:assert');
+const { once } = require('node:events');
+require('./testDatabase').assertIsolatedTestDatabase();
+const app = require('../src/server');
+const db = require('../src/config/db');
+const { dataFuturaISO } = require('./testDatabase');
+const { criarTokenSessao } = require('../src/services/authService');
 
-const BASE_URL = 'http://localhost:3000/api';
+let BASE_URL;
+let server;
 
 async function request(path, options = {}) {
   const url = `${BASE_URL}${path}`;
@@ -9,6 +16,10 @@ async function request(path, options = {}) {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
+  const usuarioId = headers.Authorization?.match(/^Bearer (\d+)$/)?.[1];
+  if (usuarioId) {
+    headers.Authorization = `Bearer ${criarTokenSessao({ id: Number(usuarioId) })}`;
+  }
 
   const response = await fetch(url, {
     method: options.method || 'GET',
@@ -33,12 +44,16 @@ async function runTests() {
   console.log('====================================================\n');
 
   // Limpeza de estado de testes anteriores para garantir idempotência
-  const db = require('../src/config/db');
+  server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  BASE_URL = `http://127.0.0.1:${server.address().port}/api`;
+
   db.prepare('DELETE FROM participantes_reuniao WHERE reuniao_id = 1 AND usuario_id = 1').run();
   db.prepare('DELETE FROM pedidos_participacao WHERE reuniao_id = 1 AND usuario_id = 1').run();
   db.prepare('DELETE FROM participantes_reuniao WHERE reuniao_id = 2 AND usuario_id = 4').run();
   db.prepare('DELETE FROM pedidos_participacao WHERE reuniao_id = 2 AND usuario_id = 4').run();
   db.prepare('DELETE FROM pedidos_participacao WHERE reuniao_id = 4 AND usuario_id = 1').run();
+  db.prepare('UPDATE reunioes SET data_reuniao = ? WHERE id IN (1, 2, 4)').run(dataFuturaISO(30));
 
   let passedCount = 0;
   let totalCount = 0;
@@ -228,7 +243,7 @@ async function runTests() {
   await test('14. Exclusão de reunião remove em cascata pedidos e participantes associados', async () => {
     const db = require('../src/config/db');
     // Criar reunião temporária para testar cascade
-    const info = db.prepare("INSERT INTO reunioes (titulo, sala_id, criador_id, data_reuniao, status) VALUES ('Reunião Temp Cascata', 1, 1, '2026-11-01', 'ativa')").run();
+    const info = db.prepare("INSERT INTO reunioes (titulo, sala_id, criador_id, data_reuniao, status) VALUES ('Reunião Temp Cascata', 1, 1, ?, 'ativa')").run(dataFuturaISO(40));
     const tempId = info.lastInsertRowid;
     db.prepare('INSERT INTO pedidos_participacao (reuniao_id, usuario_id, status, criado_em) VALUES (?, 3, \'pendente\', ?)').run(tempId, new Date().toISOString());
     db.prepare('INSERT INTO participantes_reuniao (reuniao_id, usuario_id) VALUES (?, 1)').run(tempId);
@@ -246,6 +261,27 @@ async function runTests() {
   console.log('\n====================================================');
   console.log(` RESULTADO FINAL: ${passedCount} / ${totalCount} TESTES PASSARAM COM SUCESSO! `);
   console.log('====================================================');
+  await fecharRecursos();
+  if (passedCount !== totalCount) {
+    throw new Error(`${totalCount - passedCount} caso(s) de teste falharam.`);
+  }
 }
 
-runTests().catch(console.error);
+async function fecharRecursos() {
+  if (server) {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    server = null;
+  }
+  db.close();
+}
+
+runTests().catch(async (erro) => {
+  console.error(erro);
+  try {
+    await fecharRecursos();
+  } catch (erroFechamento) {
+    console.error('Falha ao fechar recursos de teste:', erroFechamento);
+  }
+  process.exitCode = 1;
+});

@@ -1,1 +1,0 @@
--- Migration inicial reservada para alterações futuras.
